@@ -1,6 +1,6 @@
 ---
 name: self-release
-version: 1.3.1
+version: 1.3.2
 description: 当用户说「更新这个 skill / 发布这个 skill / 升级脚本到 GitHub / 打个 tag 推上去 / 安装这个 skill」时使用。自动定位目标 skill 对应的 GitHub 仓库、当前版本、最近 tag 与本地分支状态，然后按标准流程完成：版本递增（patch/minor/major，同步 SKILL.md + manifest.json + CHANGELOG.md 三处）→ 本地验证 → 本地与仓库 clone 一致性比对 → 提交推送（署名白澤 程）→ 打 tag → 汇报。也支持按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---

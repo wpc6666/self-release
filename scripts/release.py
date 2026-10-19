@@ -63,7 +63,7 @@ SKILL_MD = os.path.join(SKILL_DIR, "SKILL.md")
 CHANGELOG_MD = os.path.join(SKILL_DIR, "CHANGELOG.md")
 
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-_GH_RE = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+?(?:\.git)?(?=[\s\)\]\"'#?]|$)")
+_GH_RE = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+?(?:\.git)?(?=[\s\)\]\"'#?`，。、；：,;:<>|]|$)")
 
 
 def _err(msg):
@@ -429,6 +429,13 @@ def _remote_coords():
         except Exception:
             pass
 
+    # 兜底：复用 detect_repo 的完整五级解析（含 SKILL.md 正文链接）
+    # 否则 --check 能定位、--update 却说"没有坐标"，两套逻辑不一致
+    if not repo:
+        found, _src = detect_repo()
+        if found:
+            repo = found
+
     if not skill_id:
         skill_id = os.path.basename(SKILL_DIR)
     return repo, branch, subdir, skill_id
@@ -621,6 +628,22 @@ def run_list():
                             break
             except Exception:
                 pass
+        # 兜底：与前两处统一，用 detect_repo 的完整五级解析
+        if not repo:
+            _old = globals().get("SKILL_DIR")
+            try:
+                globals()["SKILL_DIR"] = d
+                globals()["SKILL_MD"] = os.path.join(d, "SKILL.md")
+                globals()["MANIFEST_JSON"] = mp
+                found, _src = detect_repo()
+                if found:
+                    repo = found
+            except Exception:
+                pass
+            finally:
+                globals()["SKILL_DIR"] = _old
+                globals()["SKILL_MD"] = os.path.join(_old, "SKILL.md")
+                globals()["MANIFEST_JSON"] = os.path.join(_old, "manifest.json")
         rows.append((name, ver, repo or "—", branch, subdir or "—"))
 
     if not rows:

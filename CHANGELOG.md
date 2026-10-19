@@ -3,6 +3,31 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.2] - 2026-10-19
+
+### 修复
+
+- **`--update` 与 `--check` 用两套解析逻辑，导致「零配置 skill 装不上也更新不了」**（影响最大）。
+  `_remote_coords()` 原来只读 `.release.json` + `manifest.json`，而 `detect_repo()` 有五级解析（含 SKILL.md 正文链接）。
+  结果：`--check` 能定位到仓库，`--update` 却报「skill 配置里没有仓库坐标，无法自动更新」。
+  实测复现：消费者机器上只有 `cfec-thesis-formatter`（无 `.release.json`，`manifest.json` 无 `repository`，但 SKILL.md 正文有仓库链接）→ `--update` 直接失败。
+  现在 `_remote_coords()` 末尾接入 `detect_repo()` 兜底，两条路径共用同一套解析。
+
+- **`run_list()` 同样只读 manifest**：`--list` 里这类 skill 的「仓库」列显示 `—`，agent 读表会以为没有坐标。
+  现在同样接入 `detect_repo()` 兜底。
+
+- **`_GH_RE` 前瞻字符集漏了反引号与中文标点**：SKILL.md 里链接常写成 `` `https://github.com/u/r`（main 分支…） ``，
+  反引号不在原字符集 `[\s\)\]\"'#?]` 里，正则匹配失败 → 五级兜底的第 5 级形同虚设。
+  实测复现：`https://github.com/wpc6666/cfec-thesis-formatter` + 反引号 → 修复前 `❌ None`，修复后正确匹配。
+  现在字符集加入 `` ` `` 与 `，。、；：,;:<>|`。
+
+### 影响
+
+修复前，「一句话更新」对**没有 `.release.json` 的第三方 skill 完全不可用**——这正是本功能要解决的核心场景。
+修复后实测：零配置的 cfec skill 直接 `--update` 成功拉到 v2.2.0。
+
+---
+
 ## [1.3.1] - 2026-10-19
 
 ### 修复
