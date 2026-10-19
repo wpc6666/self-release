@@ -71,6 +71,10 @@ def _err(msg):
     sys.exit(1)
 
 
+def _warn(msg):
+    sys.stderr.write("警告: %s\n" % msg)
+
+
 def _run(cmd, cwd=None, quiet=True):
     """跑命令，返回 (rc, stdout, stderr)。"""
     try:
@@ -328,14 +332,55 @@ def run_check():
     return 0 if repo else 2
 
 
-def write_release_cfg(repo, branch=None, subdir=None):
-    """写 .release.json，把仓库坐标钉死，之后自动定位不再靠猜。"""
+def write_release_cfg(repo, branch=None, subdir=None, target=None):
+    """写 .release.json，把仓库坐标钉死，之后自动定位不再靠猜。
+
+    目标目录优先级：
+      1. --target 显式指定
+      2. cwd（若 cwd 有 SKILL.md / manifest.json / .release.json，且不是本脚本所在目录）
+      3. SKILL_DIR（本脚本所在 skill）
+
+    这样 `cd ~/.dsh/skills/X && python3 ~/.dsh/skills/self-release/scripts/release.py --init <url>`
+    会正确写到 X，不会把 self-release 自己的坐标覆盖掉。
+    """
     data = {"repo": repo}
     if branch:
         data["branch"] = branch
     if subdir:
         data["subdir"] = subdir
-    path = os.path.join(SKILL_DIR, ".release.json")
+
+    dest = None
+    if target:
+        dest = os.path.abspath(os.path.expanduser(target))
+    else:
+        cwd = os.getcwd()
+        if os.path.abspath(cwd) != os.path.abspath(SKILL_DIR):
+            for marker in ("SKILL.md", "manifest.json", ".release.json"):
+                if os.path.isfile(os.path.join(cwd, marker)):
+                    dest = cwd
+                    break
+    if dest is None:
+        dest = SKILL_DIR
+
+    if not os.path.isdir(dest):
+        _err("目标目录不存在：%s" % dest)
+        return 1
+
+    path = os.path.join(dest, ".release.json")
+    # 防止手滑覆盖 self-release 自己的坐标
+    if os.path.abspath(dest) == os.path.abspath(SKILL_DIR):
+        cur = None
+        if os.path.isfile(path):
+            try:
+                cur = json.load(io.open(path, encoding="utf-8")).get("repo")
+            except Exception:
+                cur = None
+        if cur and cur != repo:
+            _warn("注意：正在改写本 skill（self-release）自身的坐标：")
+            _warn("  原 %s" % cur)
+            _warn("  新 %s" % repo)
+            _warn("  如果本意是给别的 skill 钉坐标，请先 cd 到那个目录，或用 --target。")
+
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
@@ -678,7 +723,8 @@ def main(argv=None):
     a = p.parse_args(argv)
 
     if a.init:
-        return write_release_cfg(a.init, branch=a.branch, subdir=a.subdir)
+        return write_release_cfg(a.init, branch=a.branch, subdir=a.subdir,
+                                 target=a.target)
     if a.check:
         return run_check()
     if a.bump:

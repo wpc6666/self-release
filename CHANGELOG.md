@@ -3,6 +3,18 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.0] - 2026-10-19
+
+### 修复
+- **`--init` 会把坐标写到 self-release 自己身上**（严重）：`write_release_cfg()` 原来固定用 `SKILL_DIR`，导致 `cd ~/.dsh/skills/X && python3 ~/.dsh/skills/self-release/scripts/release.py --init <url>` 把 X 的坐标覆盖掉 self-release 自己的 `.release.json`。现在按三级优先级解析目标目录：`--target` → cwd（若含 SKILL.md/manifest.json/.release.json）→ `SKILL_DIR`。
+- `--init` 新增 `--target` 参数支持。
+- 目标目录不存在时报错退出，不再静默创建。
+- 覆盖 self-release 自身坐标且新值不同时打印警告，避免手滑。
+- 新增 `_warn()` 辅助函数（原来只有 `_err()`）。
+
+### 变更
+- SKILL.md 的 `--init` 用法改为三种写法并标出推荐顺序。
+
 ## [1.2.0] - 2026-10-19
 
 ### 新增
