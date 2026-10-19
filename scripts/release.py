@@ -772,6 +772,19 @@ def run_update(target=None, keep_local=None, name=None):
                 shutil.copytree(s, d)
             else:
                 shutil.copy2(s, d)
+        # 仓库根的访客文件（README / index.html / LICENSE）也要一起搬。
+        # 它们不在 skill 子目录里，但 verify 会回退到仓库根比对 ——
+        # 不搬的话本地永远是旧版，verify 每次报「存在差异」（cfec 踩到）。
+        if subdir:
+            repo_root = os.path.join(tmpd, roots[0])
+            for rf in ("README.md", "index.html", "LICENSE"):
+                src_f = os.path.join(repo_root, rf)
+                dst_f = os.path.join(dest, rf)
+                if os.path.isfile(src_f):
+                    # 总是覆盖：这是消费副本，应跟随仓库。
+                    # 用 not exists 判断会让首次装完后永久停在旧版（实测踩到）。
+                    shutil.copy2(src_f, dst_f)
+
         # 摊平后必须删掉 dest 里残留的同名子目录，否则下次又会被当成
         # 「skill 在子目录」的依据，且文件是旧副本（实测 cfec 踩到）
         stale = os.path.join(dest, subdir) if subdir else None

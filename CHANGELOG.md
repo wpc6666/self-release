@@ -3,6 +3,24 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.1] - 2026-10-19
+
+### 修复
+
+- **`update` 不同步仓库根的访客文件**（README / index.html / LICENSE）。
+  子目录 skill 的 README 与 index.html 通常在仓库根（面向访客），
+  而摊平逻辑只搬 skill 子目录内容 → 本地 README 永久停在首次安装的版本，
+  `verify` 每次报「存在差异」。现补搬并**总是覆盖**（消费副本应跟随仓库；
+  用 `not exists` 判断会让首次装完后永久停在旧版）。
+
+## [1.8.1] - 2026-10-19
+
+### 变更
+
+- （待补充：本次改动内容）
+
+---
+
 ## [1.8.0] - 2026-10-19
 
 ### 修复（6 个真 bug，全部由「拿第三方子目录 skill 实测」暴露）
