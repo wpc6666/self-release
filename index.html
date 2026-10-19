@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>self-release · Skill 自更新与发布</title>
+<meta name="description" content="说一句话就能发布或更新 AI Agent skill，坐标写在 skill 自己身上，不需要原始链接。">
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --bg3:#21262d;
+    --fg:#e6edf3; --fg2:#8b949e; --fg3:#6e7681;
+    --accent:#58a6ff; --accent2:#3fb950; --warn:#d29922; --danger:#f85149;
+    --border:#30363d; --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    line-height:1.7;font-size:16px;
+    padding:0 16px;overflow-x:hidden;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:32px 0 64px}
+
+  header{text-align:center;padding:24px 0 32px;border-bottom:1px solid var(--border);margin-bottom:32px}
+  h1{font-size:clamp(24px,6vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.25}
+  h1 .sub{display:block;font-size:clamp(13px,3.2vw,16px);color:var(--fg2);font-weight:400;margin-top:10px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+  .badges img{height:20px;display:block}
+
+  h2{font-size:clamp(18px,4.4vw,22px);font-weight:650;margin:40px 0 14px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.35}
+  h3{font-size:clamp(15px,3.6vw,17px);font-weight:600;margin:24px 0 10px;color:var(--fg)}
+  p{margin:10px 0;color:var(--fg)}
+  .muted{color:var(--fg2);font-size:14px}
+
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  ul,ol{margin:10px 0 10px 20px}
+  li{margin:6px 0}
+
+  code{
+    background:var(--bg3);padding:2px 6px;border-radius:5px;
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-size:.88em;color:#79c0ff;
+    white-space:pre-wrap;overflow-wrap:anywhere;
+  }
+  pre{
+    background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;margin:14px 0;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  pre code{background:none;padding:0;color:var(--fg);font-size:13px;line-height:1.6;white-space:pre}
+  .cmt{color:var(--fg3)}
+  .ok{color:var(--accent2)}
+  .hl{color:var(--accent)}
+
+  .card{
+    background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;margin:16px 0;
+  }
+  .card.hi{border-left:4px solid var(--accent)}
+  .card.good{border-left:4px solid var(--accent2)}
+  .card.warn{border-left:4px solid var(--warn)}
+
+  .table-wrap{
+    position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    margin:14px 0;border:1px solid var(--border);border-radius:var(--radius);
+  }
+  .table-wrap table{width:100%;min-width:340px;border-collapse:collapse;font-size:14px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--bg3);font-weight:600;color:var(--fg);white-space:nowrap}
+  td{color:var(--fg2)}
+  td strong{color:var(--fg)}
+  tr:last-child td{border-bottom:none}
+  .swipe-hint{display:none;font-size:12px;color:var(--fg3);text-align:center;padding:6px 0 0}
+
+  .flow{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    margin:16px 0;font-size:13px;
+  }
+  .flow span{background:var(--bg3);border:1px solid var(--border);padding:6px 12px;border-radius:20px;white-space:nowrap}
+  .flow .arrow{background:none;border:none;color:var(--fg3);padding:0 2px}
+
+  footer{
+    margin-top:56px;padding-top:24px;border-top:1px solid var(--border);
+    text-align:center;color:var(--fg3);font-size:13px;
+  }
+  footer a{color:var(--fg2)}
+
+  @media (max-width:768px){
+    .wrap{padding:20px 0 48px}
+    h2{margin:32px 0 12px}
+    pre{padding:12px;font-size:12.5px}
+    .card{padding:15px 16px}
+    .flow{font-size:12px;gap:6px}
+    .flow span{padding:5px 10px}
+  }
+  @media (max-width:380px){
+    body{padding:0 12px;font-size:15px}
+    h1{font-size:22px}
+    .badges img{height:18px}
+    pre{padding:10px;font-size:12px}
+    th,td{padding:8px 10px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>self-release
+    <span class="sub">说一句话就能发布或更新 skill · 坐标写在 skill 自己身上</span>
+  </h1>
+  <div class="badges">
+    <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="version">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="license">
+    <img src="https://img.shields.io/badge/python-3.8%2B-3776AB.svg" alt="python">
+  </div>
+</header>
+
+<h2>解决什么问题</h2>
+<p>发布 skill 时每次都要手打仓库地址、翻版本号、想分支名——重复且容易错。更麻烦的是<strong>换一台机器后，本地 skill 不知道自己的仓库在哪</strong>，用户还得重新找链接。</p>
+
+<div class="card hi">
+  <p><strong>这个 skill 把坐标钉在 skill 自己身上。</strong>发布一次，写进 <code>.release.json</code>，之后任何机器、任何会话，说一句「更新 X」就能拉最新版。</p>
+  <pre><code><span class="cmt"># 以前：得先问用户「这个 skill 的仓库是哪个？」</span>
+<span class="cmt"># 现在：</span>
+python3 scripts/release.py --update</code></pre>
+</div>
+
+<h2>一句话流程</h2>
+<div class="flow">
+  <span>定位</span><span class="arrow">→</span>
+  <span>递增版本</span><span class="arrow">→</span>
+  <span>本地验证</span><span class="arrow">→</span>
+  <span>同步 clone</span><span class="arrow">→</span>
+  <span>提交推送</span><span class="arrow">→</span>
+  <span>打 tag</span><span class="arrow">→</span>
+  <span>汇报</span>
+</div>
+
+<h2>三种使用场景</h2>
+
+<h3>场景 A · 发布（本机改完代码）</h3>
+<pre><code>cd ~/.dsh/skills/&lt;你的 skill&gt;
+
+python3 scripts/release.py --check                  <span class="cmt"># 定位仓库 / 版本 / tag</span>
+python3 scripts/release.py --bump patch --dry-run   <span class="cmt"># 预览版本变化</span>
+python3 scripts/release.py --bump patch             <span class="cmt"># 真写入（同步三处）</span>
+python3 scripts/release.py --verify                 <span class="cmt"># 本地 vs 远端 blob</span></code></pre>
+
+<h3>场景 B · 更新（别的机器，本地已有）</h3>
+<pre><code>cd ~/.dsh/skills/X
+python3 scripts/release.py --update</code></pre>
+<p class="muted">自动区分两条路径：git 仓库走 <code>fetch</code> + <code>reset --hard</code>；非 git 目录走 tarball 覆盖。两者都保留本地 <code>.release.json</code>。</p>
+
+<h3>场景 C · 新装（新机器，本地没有）</h3>
+<pre><code>git clone https://github.com/wpc6666/self-release.git /tmp/sr
+cd /tmp/sr
+python3 scripts/release.py --init https://github.com/&lt;user&gt;/&lt;repo&gt;.git
+python3 scripts/release.py --install --target ~/.dsh/skills/X</code></pre>
+<p class="muted">坐标只需提供一次，之后永久免链接。</p>
+
+<h2>全部命令</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>命令</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><code>--check</code></td><td>定位：仓库地址、当前版本、最近 tag、分支同步状态</td></tr>
+    <tr><td><code>--bump patch</code></td><td>递增版本，同步 <code>SKILL.md</code> + <code>manifest.json</code> + <code>CHANGELOG.md</code></td></tr>
+    <tr><td><code>--bump minor</code></td><td>新增向后兼容功能时用</td></tr>
+    <tr><td><code>--bump major</code></td><td>破坏性变更时用</td></tr>
+    <tr><td><code>--dry-run</code></td><td>配合 <code>--bump</code>，只预览不写文件</td></tr>
+    <tr><td><code>--verify</code></td><td>比对本地文件 blob 与远端 GitHub blob</td></tr>
+    <tr><td><code>--init &lt;url&gt;</code></td><td>钉死仓库坐标，写入 <code>.release.json</code></td></tr>
+    <tr><td><code>--install</code></td><td>按坐标安装（新机器首次）</td></tr>
+    <tr><td><code>--update</code></td><td>按坐标拉最新版（保留 <code>.release.json</code>）</td></tr>
+    <tr><td><code>--list</code></td><td>列出所有已装 skill 的版本与发布坐标</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>自动定位规则</h2>
+<p>按优先级依次尝试，<strong>命中即停</strong>：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>目标</th><th>优先级</th></tr></thead>
+  <tbody>
+    <tr><td><strong>仓库地址</strong></td><td><code>.release.json</code> 的 <code>repo</code> → <code>.git/config</code> 的 <code>origin</code> → 向上 6 层找 <code>.git</code> → <code>manifest.json</code> 的 <code>repository</code> → <code>SKILL.md</code> 正文首个 GitHub 链接</td></tr>
+    <tr><td><strong>当前版本</strong></td><td><code>manifest.json</code> 的 <code>version</code> → <code>SKILL.md</code> frontmatter → 一级标题里的 <code>vX.Y.Z</code></td></tr>
+    <tr><td><strong>分支名</strong></td><td><code>git branch --show-current</code>（fork 仓库常为 <code>master</code>）</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="muted">全部落空时 <code>--check</code> 返回 <strong>exit=2</strong> 并打印排查清单，此时应停下来问用户——不猜、不新建仓库。</p>
+
+<h2>接入新 skill</h2>
+<pre><code>mkdir -p &lt;skill_dir&gt;/scripts
+cp ~/.dsh/skills/self-release/scripts/release.py &lt;skill_dir&gt;/scripts/
+
+cd &lt;skill_dir&gt;
+python3 scripts/release.py --init https://github.com/&lt;user&gt;/&lt;repo&gt;.git --subdir "&lt;路径&gt;"</code></pre>
+<p class="muted">同时确认 <code>manifest.json</code> 至少有 <code>id</code> 和 <code>version</code>，最好补 <code>repository</code> 作为兜底。</p>
+
+<h2>边界与红线</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>情况</th><th>处理</th></tr></thead>
+  <tbody>
+    <tr><td>找不到仓库地址</td><td>停下来问用户，不猜、不新建仓库</td></tr>
+    <tr><td>本地和 clone 不一致</td><td>查原因（可能上次漏同步），不强行 <code>--force</code></td></tr>
+    <tr><td><code>git push</code> 报 TLS</td><td>GitHub 偶发抖动，直接重试，不改 git 配置</td></tr>
+    <tr><td>推送后 raw CDN 还是旧内容</td><td>正常现象，用 <code>git ls-remote</code> + <code>gh api contents</code> 验证</td></tr>
+    <tr><td>目标目录非空</td><td>拒绝写入，先问用户</td></tr>
+    <tr><td>用户没说要发布</td><td>只改本地，不提交、不推送、不打 tag</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>环境要求</h2>
+<ul>
+  <li>Python 3.8+（<strong>只用标准库</strong>，无第三方依赖）</li>
+  <li><code>git</code></li>
+  <li><code>gh</code> CLI（仅 <code>--verify</code> 需要）</li>
+</ul>
+
+<h2>相关项目</h2>
+<div class="card">
+  <p><a href="https://github.com/wpc6666/plot-cjk-config">plot-cjk-config</a> — macOS 中文绘图配置，R / Python / Stata 三套工具链不出豆腐块</p>
+  <p><a href="https://github.com/wpc6666/dsh-agents">dsh-agents</a> — 跨工具 AI Agent 全局行为准则</p>
+</div>
+
+<footer>
+  <p>MIT © 白澤 程 · <a href="https://github.com/wpc6666/self-release">GitHub 仓库</a></p>
+</footer>
+
+</div>
+<script>
+(function(){
+  function markScrollable(){
+    document.querySelectorAll('.table-wrap').forEach(function(w){
+      var hint = w.nextElementSibling;
+      var overflow = w.scrollWidth - w.clientWidth > 1;
+      w.classList.toggle('is-scrollable', overflow);
+      if (hint && hint.classList && hint.classList.contains('swipe-hint')){
+        hint.style.display = overflow ? 'block' : 'none';
+      }
+    });
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', markScrollable);
+  } else {
+    markScrollable();
+  }
+  window.addEventListener('resize', markScrollable);
+  if (window.ResizeObserver){
+    new ResizeObserver(markScrollable).observe(document.body);
+  }
+})();
+</script>
+</body>
+</html>
