@@ -124,6 +124,26 @@ cat > "${DEST}/.release.json" <<EOF
 EOF
 ok "已写入 .release.json（以后更新不需要原始链接）"
 
+# ---------- 安装 skill 短命令 ----------
+# 这是「只说一句话」的关键：用户敲 skill update X，而不是一长串 python3 路径
+LOCAL_BIN="${HOME}/.local/bin"
+mkdir -p "${LOCAL_BIN}"
+if [[ -f "${DEST}/skill" ]]; then
+  cp "${DEST}/skill" "${LOCAL_BIN}/skill"
+  chmod +x "${LOCAL_BIN}/skill"
+  ok "已安装 skill 命令：${LOCAL_BIN}/skill"
+  case ":${PATH}:" in
+    *":${LOCAL_BIN}:"*) ;;
+    *)
+      warn "${LOCAL_BIN} 不在 PATH 里，把下面这行加到 ~/.zshrc："
+      echo "    export PATH=\"\${HOME}/.local/bin:\${PATH}\""
+      ;;
+  esac
+else
+  warn "仓库里没有 skill 命令（旧版本），跳过；可用长命令："
+  echo "    python3 ${DEST}/scripts/release.py --list"
+fi
+
 # ---------- 自检 ----------
 echo
 echo "──────── 自检 ────────"
@@ -141,10 +161,11 @@ echo
 echo "════════════════════════════════════════════════════"
 echo "  下一步"
 echo "════════════════════════════════════════════════════"
-echo "  发布 skill：cd <skill目录> && python3 scripts/release.py --check"
-echo "  更新 skill：cd <skill目录> && python3 scripts/release.py --update"
-echo "  查看全部  ：python3 ${DEST}/scripts/release.py --list"
+echo "  更新 skill：skill update <名字>        （只说名字，不用 cd）"
+echo "  更新全部  ：skill update --all"
+echo "  装新 skill：skill install <名字> --from-repo <仓库地址>"
+echo "  查看全部  ：skill list"
+echo "  上架新 skill：cd <skill目录> && skill up --yes"
 echo
-echo "  其他 skill 要接入一句话更新，跑一次："
-echo "    cd <skill目录> && python3 ${DEST}/scripts/release.py --init <仓库地址>"
+echo "  提示：以后直接对 agent 说「更新这个 skill」就行，它会自己跑 skill update"
 echo "════════════════════════════════════════════════════"

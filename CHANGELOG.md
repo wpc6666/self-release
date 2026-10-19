@@ -3,6 +3,31 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.6.0] - 2026-10-19
+
+### 新增
+
+- **`skill` 短命令**：`~/.local/bin/skill` 薄包装，把
+  `python3 ~/.dsh/skills/self-release/scripts/release.py --update X`
+  变成 `skill update X`。缺 self-release 时会自动引导安装（第 0 级）。
+- `install.sh` 装完后自动把 `skill` 放到 `~/.local/bin/` 并 chmod +x；
+  PATH 里没有时给出加 PATH 的提示。
+- 子命令：`update` / `update --all` / `install` / `list` / `check` /
+  `bump` / `verify` / `init` / `up`。
+
+### 说明
+
+用户不再需要看长路径命令。对 agent 说「更新这个 skill」即可，
+agent 按 AGENTS.md 直接跑 `skill update X`。
+
+## [1.6.0] - 2026-10-19
+
+### 变更
+
+- （待补充：本次改动内容）
+
+---
+
 ## [1.5.0] - 2026-10-19
 
 ### 新增：安装即记住仓库 + 只说名字就能更新

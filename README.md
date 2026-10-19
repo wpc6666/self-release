@@ -24,7 +24,7 @@ python3 scripts/release.py --update
 
 | 级别 | 前提 | agent 动作 |
 |---|---|---|
-| 1 | `X/.release.json` 存在 | `cd X && python3 scripts/release.py --update` |
+| 1 | `X/.release.json` 存在 | `skill update X` |
 | 2 | 只有 `manifest.json` 的 `repository` | 同上（自动回退读 manifest） |
 | 3 | 什么坐标都没有 | **问用户一次**仓库地址 → `--init` 钉死 → 之后永久免问 |
 
@@ -42,17 +42,25 @@ curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.s
 
 装到 `~/.dsh/skills/self-release/`，自动写入 `.release.json`。**幂等**——已装过会转为更新流程。
 
+## 一句话
+
+对 agent 说「更新这个 skill」，它跑 `skill update X`。**你不需要记仓库地址、版本号、也不需要看长路径命令。**
+
+```bash
+skill update X        # 更新某个 skill
+skill update --all    # 全部更新
+skill list            # 看有哪些、版本多少
+skill up --yes        # 上架新 skill（建仓库+开Pages+主页加卡片）
+```
+
 ## 快速开始
 
 ### 发布：改完代码后升版本推送
 
 ```bash
-cd ~/.dsh/skills/<你的 skill>
-
-python3 scripts/release.py --check                  # 定位：仓库 / 版本 / tag / 分支状态
-python3 scripts/release.py --bump patch --dry-run   # 先预览版本变化
-python3 scripts/release.py --bump patch             # 真写入（同步三处文件）
-python3 scripts/release.py --verify                 # 本地 vs 远端 blob 一致性
+skill check          # 定位：仓库 / 版本 / tag / 分支状态
+skill bump patch     # 递增版本（同步 SKILL.md / manifest.json / CHANGELOG.md 三处）
+skill verify         # 本地 vs 远端 blob 一致性
 ```
 
 然后按 `SKILL.md` 的七步流程走：验证 → 同步 clone → 提交推送 → 打 tag → 汇报。
@@ -60,7 +68,7 @@ python3 scripts/release.py --verify                 # 本地 vs 远端 blob 一�
 ### 更新：只说名字，不用 cd
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py --update X
+skill update X
 ```
 
 脚本按名字定位到 `$DSH_HOME/skills/X`，然后自动区分两条路径：
@@ -73,7 +81,7 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update X
 **整个仓库一起更新**（一个仓库里放了多个 skill）：
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
+skill update X
 ```
 
 解析出 X 所属仓库 → 扫描所有已装 skill → 坐标相同的全部更新一遍。
@@ -81,8 +89,7 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
 ### 新装：新机器上从零装
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py \
-        --install X --from-repo https://github.com/<user>/<repo>.git
+skill install X --from-repo https://github.com/<user>/<repo>.git
 ```
 
 `--from-repo` 装完后**自动把坐标写进目标目录的 `.release.json`**，

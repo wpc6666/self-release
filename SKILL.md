@@ -1,7 +1,7 @@
 ---
 name: self-release
-version: 1.5.0
-description: 当用户说「更新这个 skill / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（三处元数据同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
+version: 1.6.0
+description: 当用户说「更新这个 skill / 更新 X / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。日常一律用 `skill` 短命令（`skill update X` / `skill list` / `skill up`），不要让用户看到 `python3 .../release.py` 长路径。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（三处元数据同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
 
@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.s
 **agent 处理「我新电脑上啥都没有，装一下 X」时的正确做法**：
 
 1. 先跑上面的 curl 装 self-release（一条命令，幂等，已装则自动转更新）
-2. 再 `python3 ~/.dsh/skills/self-release/scripts/release.py --init <X的仓库地址>`
+2. 再 `skill init <X的仓库地址>`
 3. 最后 `--install --target ~/.dsh/skills/X`
 
 第 2 步的仓库地址只需提供一次。
@@ -80,7 +80,7 @@ python3 scripts/release.py --bump minor
 ### 场景 B：用户说「更新 X」——只说名字就够，不用 cd
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py --update X
+skill update X
 ```
 
 脚本按名字定位到 `$DSH_HOME/skills/X`，读它的 `.release.json` → `git fetch` +
@@ -91,7 +91,7 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update X
 **整个仓库一起更新**（一个仓库里放了多个 skill 时）：
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
+skill update X
 ```
 
 解析出 X 所属仓库 → 扫描所有已装 skill → 坐标相同的全部更新一遍。
@@ -99,8 +99,7 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
 ### 场景 C：新机器，本地还没有这个 skill
 
 ```bash
-python3 ~/.dsh/skills/self-release/scripts/release.py \
-        --install X --from-repo https://github.com/<user>/<repo>.git
+skill install X --from-repo https://github.com/<user>/<repo>.git
 ```
 
 `--from-repo` 装完后**自动把坐标写进目标目录的 `.release.json`**，
@@ -331,7 +330,7 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 
 ```bash
 cd ~/.dsh/skills/X
-python3 ~/.dsh/skills/self-release/scripts/release.py --init https://github.com/<user>/<repo>.git --subdir "<路径>"
+skill init https://github.com/<user>/<repo>.git --subdir "<路径>"
 ```
 
 `--init` 写 `.release.json`，之后 `--update` / `--list` 全部自动。

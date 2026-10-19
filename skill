@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# ============================================================
+# skill — 一句话操作 AI Agent skill（更新 / 安装 / 发布 / 上架 / 列表）
+#
+# 用法：
+#   skill update [名字]        更新 skill（不给名字=当前目录，或全部）
+#   skill update --all         更新全部已装 skill
+#   skill install <名字> [--from-repo <url>]
+#   skill list                 列出已装 skill 与坐标
+#   skill check [名字]         检查定位是否正常
+#   skill bump <patch|minor|major> [--dry-run]
+#   skill verify               比对本地与远端
+#   skill publish              提交 + 推送 + 打 tag
+#   skill up [--yes]           一键上架（建仓库/开Pages/生成网页/主页卡片）
+#   skill init <repo_url> [--subdir <路径>]
+#
+# 设计：薄包装，所有逻辑都在 self-release 的 release.py / new_repo.py。
+# 目标：agent 只需要记 `skill update X`，不用记 python3 长路径。
+# ============================================================
+set -uo pipefail
+
+SELF_REPO="wpc6666/self-release"
+INSTALL_URL="https://raw.githubusercontent.com/${SELF_REPO}/main/install.sh"
+SKILLS_ROOT="${DSH_HOME:-${HOME}/.dsh}/skills"
+SELF_DIR="${SKILLS_ROOT}/self-release"
+
+_dim()  { printf '\033[2m%s\033[0m\n' "$*"; }
+_err()  { printf '\033[31m错误:\033[0m %s\n' "$*" >&2; }
+_ok()   { printf '\033[32m✓\033[0m %s\n' "$*"; }
+
+# ── 找 release.py：优先本机已装，缺失则自动安装 ──────────────
+# 注意：本函数被 $(...) 捕获，所有提示必须走 stderr，否则会污染返回的路径。
+_release_py() {
+    local p="${SELF_DIR}/scripts/release.py"
+    if [[ -f "$p" ]]; then
+        echo "$p"; return 0
+    fi
+    printf '\033[2m本机没有 self-release，正在自动安装…\033[0m\n' >&2
+    if ! curl -fsSL --retry 3 --connect-timeout 15 "$INSTALL_URL" | bash >&2; then
+        _err "自动安装 self-release 失败。手动执行：" >&2
+        printf '\033[2m  curl -fsSL %s | bash\033[0m\n' "$INSTALL_URL" >&2
+        return 1
+    fi
+    [[ -f "$p" ]] || { _err "安装后仍找不到 $p" >&2; return 1; }
+    echo "$p"
+}
+
+_new_repo_py() {
+    local p="${SELF_DIR}/scripts/new_repo.py"
+    [[ -f "$p" ]] || { _err "缺少 new_repo.py，先跑 skill update self-release"; return 1; }
+    echo "$p"
+}
+
+# ── 当前目录是 skill 吗 ──────────────────────────────────────
+_cwd_is_skill() {
+    [[ -f "./SKILL.md" || -f "./manifest.json" || -f "./.release.json" ]]
+}
+
+usage() {
+    cat <<'EOF'
+skill — 一句话操作 AI Agent skill
+
+  skill update [名字]        更新 skill（不给名字=当前目录 skill；用 --all 更新全部）
+  skill install <名字> [--from-repo <url>]
+  skill list                 列出已装 skill 与发布坐标
+  skill check [名字]         检查自动定位是否正常
+  skill bump <patch|minor|major> [--dry-run]
+  skill verify               比对本地文件与 GitHub 远端
+  skill publish [信息]       提交 + 推送 + 打 tag
+  skill up [--yes]           一键上架（建仓库 → Pages → 网页 → 主页卡片）
+  skill init <repo_url> [--subdir <路径>]
+
+示例：
+  skill update cfec-thesis-formatter
+  skill update                    # 在 skill 目录里跑，更新自己
+  skill update --all
+  skill list
+EOF
+}
+
+cmd="${1:-}"; shift || true
+
+case "$cmd" in
+    update|up-all|u)
+        rp="$(_release_py)" || exit 1
+        if [[ "${1:-}" == "--all" ]]; then
+            # 遍历全部带 release.py 的 skill，逐个更新
+            n=0; fail=0
+            for d in "$SKILLS_ROOT"/*/; do
+                [[ -f "${d}scripts/release.py" ]] || continue
+                name=$(basename "$d")
+                printf '\n\033[1m--- %s ---\033[0m\n' "$name"
+                if python3 "$rp" --update "$name"; then n=$((n+1)); else fail=$((fail+1)); fi
+            done
+            printf '\n'
+            _ok "更新完成：成功 ${n} 个，失败 ${fail} 个"
+            [[ "$fail" -eq 0 ]]
+        elif [[ -n "${1:-}" ]]; then
+            # 有名字：按名字更新（也接受 URL，转给 --update-repo）
+            if [[ "$1" == http* || "$1" == git@* ]]; then
+                exec python3 "$rp" --update-repo "$1"
+            fi
+            exec python3 "$rp" --update "$1"
+        else
+            # 没名字：当前目录是 skill 就更新自己，否则更新全部
+            if _cwd_is_skill; then
+                exec python3 "$rp" --update
+            else
+                _dim "当前目录不是 skill，改为更新全部…"
+                exec "$0" update --all
+            fi
+        fi
+        ;;
+
+    install|i)
+        [[ -n "${1:-}" ]] || { _err "需要 skill 名字"; _dim "  skill install <名字> --from-repo <url>"; exit 1; }
+        rp="$(_release_py)" || exit 1
+        exec python3 "$rp" --install "$@"
+        ;;
+
+    list|ls|l)
+        rp="$(_release_py)" || exit 1
+        exec python3 "$rp" --list
+        ;;
+
+    check|c)
+        rp="$(_release_py)" || exit 1
+        if [[ -n "${1:-}" ]]; then
+            export RELEASE_SKILL_DIR="${SKILLS_ROOT}/$1"
+        elif _cwd_is_skill; then
+            export RELEASE_SKILL_DIR="$PWD"
+        fi
+        exec python3 "$rp" --check
+        ;;
+
+    bump)
+        [[ -n "${1:-}" ]] || { _err "需要 patch|minor|major"; exit 1; }
+        rp="$(_release_py)" || exit 1
+        _cwd_is_skill || { _err "当前目录不是 skill（缺 SKILL.md / manifest.json）"; exit 1; }
+        export RELEASE_SKILL_DIR="$PWD"
+        exec python3 "$rp" --bump "$@"
+        ;;
+
+    verify|v)
+        rp="$(_release_py)" || exit 1
+        _cwd_is_skill || { _err "当前目录不是 skill"; exit 1; }
+        export RELEASE_SKILL_DIR="$PWD"
+        exec python3 "$rp" --verify
+        ;;
+
+    publish|p)
+        rp="$(_release_py)" || exit 1
+        _cwd_is_skill || { _err "当前目录不是 skill"; exit 1; }
+        cd "$PWD" || exit 1
+        _ok "一致性检查…"
+        RELEASE_SKILL_DIR="$PWD" python3 "$rp" --verify || {
+            _err "本地与远端不一致，先推送再发布"; exit 1
+        }
+        _dim "提示：先用 skill bump 递增版本，再跑 skill publish"
+        ;;
+
+    up|publish-repo)
+        np="$(_new_repo_py)" || exit 1
+        _cwd_is_skill || { _err "当前目录不是 skill"; exit 1; }
+        exec python3 "$np" "$@"
+        ;;
+
+    init)
+        [[ -n "${1:-}" ]] || { _err "需要仓库地址"; exit 1; }
+        rp="$(_release_py)" || exit 1
+        export RELEASE_SKILL_DIR="$PWD"
+        exec python3 "$rp" --init "$@"
+        ;;
+
+    ""|-h|--help|help)
+        usage
+        ;;
+
+    *)
+        _err "未知子命令: $cmd"
+        echo
+        usage
+        exit 1
+        ;;
+esac

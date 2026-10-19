@@ -113,7 +113,7 @@
     <span class="sub">说一句话就能发布或更新 skill · 坐标写在 skill 自己身上</span>
   </h1>
   <div class="badges">
-    <img src="https://img.shields.io/badge/version-1.5.0-blue.svg" alt="version">
+    <img src="https://img.shields.io/badge/version-1.6.0-blue.svg" alt="version">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="license">
     <img src="https://img.shields.io/badge/python-3.8%2B-3776AB.svg" alt="python">
   </div>
@@ -140,21 +140,18 @@ python3 scripts/release.py --update</code></pre>
   <span>汇报</span>
 </div>
 
-<h2>三种使用场景</h2>
+<h2>四种使用场景</h2>
 
 <h3>场景 A · 发布（本机改完代码）</h3>
-<pre><code>cd ~/.dsh/skills/&lt;你的 skill&gt;
-
-python3 scripts/release.py --check                  <span class="cmt"># 定位仓库 / 版本 / tag</span>
-python3 scripts/release.py --bump patch --dry-run   <span class="cmt"># 预览版本变化</span>
-python3 scripts/release.py --bump patch             <span class="cmt"># 真写入（同步三处）</span>
-python3 scripts/release.py --verify                 <span class="cmt"># 本地 vs 远端 blob</span></code></pre>
+<pre><code>skill check          <span class="cmt"># 定位仓库 / 版本 / tag</span>
+skill bump patch     <span class="cmt"># 递增版本（同步三处文件）</span>
+skill verify         <span class="cmt"># 本地 vs 远端 blob</span></code></pre>
 
 <h3>场景 B · 更新（只说名字，不用 cd）</h3>
-<pre><code>python3 ~/.dsh/skills/self-release/scripts/release.py --update X
+<pre><code>skill update X
 
 <span class="cmt"># 整个仓库一起更新（一个仓库放了多个 skill）</span>
-python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X</code></pre>
+skill update X        <span class="cmt"># 自动识别仓库并更新其下全部 skill</span></code></pre>
 <p class="muted">按名字定位到 <code>$DSH_HOME/skills/X</code>，自动区分两条路径：git 仓库走 <code>fetch</code> + <code>reset --hard</code>；非 git 目录走 tarball 覆盖。两者都保留本地 <code>.release.json</code>。</p>
 
 <h3>场景 C · 新装（新机器，连本 skill 都没有）</h3>
@@ -162,21 +159,20 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X</code></pr
 <p class="muted">一条命令装好并自动写入 <code>.release.json</code>。幂等——已装过会转为更新流程。</p>
 
 <h3>场景 D · 装其他 skill（本 skill 已就位）</h3>
-<pre><code>python3 ~/.dsh/skills/self-release/scripts/release.py \
-  --install X --from-repo https://github.com/&lt;user&gt;/&lt;repo&gt;.git
+<pre><code>skill install X --from-repo https://github.com/&lt;user&gt;/&lt;repo&gt;.git
 
 <span class="cmt"># ✅ 已记录仓库坐标：~/.dsh/skills/X/.release.json</span>
 <span class="cmt">#    以后说「更新 X」即可，不用再提供链接。</span></code></pre>
 <p class="muted">装完<strong>自动把坐标写进目标目录的 <code>.release.json</code></strong>，坐标只需提供一次，之后永久免链接。</p>
 
 <h2>「一句话更新」靠什么成立</h2>
-<p>用户说「更新 X」，agent 不问任何东西，靠<strong>三级兜底</strong>：</p>
+<p>用户说「更新 X」，agent 不问任何东西，靠<strong>四级兜底</strong>：</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>级别</th><th>前提</th><th>agent 动作</th></tr></thead>
   <tbody>
     <tr><td>0</td><td>本机连 <code>self-release</code> 都没有</td><td>跑上面那条 <code>install.sh</code> curl 引导命令</td></tr>
-    <tr><td>1</td><td><code>X/.release.json</code> 存在</td><td><code>release.py --update X</code>（不用 cd）</td></tr>
+    <tr><td>1</td><td><code>X/.release.json</code> 存在</td><td><code>skill update X</code>（不用 cd）</td></tr>
     <tr><td>2</td><td>只有 <code>manifest.json</code> 的 <code>repository</code></td><td>同上（自动回退读 manifest）</td></tr>
     <tr><td>3</td><td>什么坐标都没有</td><td><strong>这时才问一次</strong>仓库地址 → <code>--init</code> 钉死 → 之后永久免问</td></tr>
   </tbody>
@@ -189,20 +185,17 @@ python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X</code></pr
 <table>
   <thead><tr><th>命令</th><th>作用</th></tr></thead>
   <tbody>
-    <tr><td><code>--check</code></td><td>定位：仓库地址、当前版本、最近 tag、分支同步状态</td></tr>
-    <tr><td><code>--bump patch</code></td><td>递增版本，同步 <code>SKILL.md</code> + <code>manifest.json</code> + <code>CHANGELOG.md</code></td></tr>
-    <tr><td><code>--bump minor</code></td><td>新增向后兼容功能时用</td></tr>
-    <tr><td><code>--bump major</code></td><td>破坏性变更时用</td></tr>
-    <tr><td><code>--dry-run</code></td><td>配合 <code>--bump</code>，只预览不写文件</td></tr>
-    <tr><td><code>--verify</code></td><td>比对本地文件 blob 与远端 GitHub blob</td></tr>
-    <tr><td><code>--init &lt;url&gt;</code></td><td>钉死仓库坐标，写入 <code>.release.json</code></td></tr>
-    <tr><td><code>--install</code></td><td>按当前目录坐标安装</td></tr>
-    <tr><td><code>--install NAME --from-repo URL</code></td><td>从指定仓库安装，<strong>并自动记录坐标</strong></td></tr>
-    <tr><td><code>--update</code></td><td>更新当前目录的 skill</td></tr>
-    <tr><td><code>--update NAME</code></td><td><strong>只说名字</strong>更新，不用 cd</td></tr>
-    <tr><td><code>--update-repo NAME</code></td><td>更新该仓库下的<strong>全部</strong> skill</td></tr>
-    <tr><td><code>--list</code></td><td>列出所有已装 skill 的版本与发布坐标</td></tr>
-    <tr><td><code>install.sh</code></td><td>引导安装器（<code>curl ... | bash</code>），幂等</td></tr>
+    <tr><td><code>skill list</code></td><td>列出所有已装 skill 的版本与发布坐标</td></tr>
+    <tr><td><code>skill check</code></td><td>定位：仓库地址、当前版本、最近 tag、分支同步状态</td></tr>
+    <tr><td><code>skill update X</code></td><td><strong>只说名字</strong>更新，不用 cd；一个仓库多 skill 时全更新</td></tr>
+    <tr><td><code>skill update --all</code></td><td>更新全部已装 skill</td></tr>
+    <tr><td><code>skill install X --from-repo URL</code></td><td>装新 skill，<strong>并自动记录坐标</strong></td></tr>
+    <tr><td><code>skill init &lt;url&gt;</code></td><td>钉死仓库坐标，写入 <code>.release.json</code></td></tr>
+    <tr><td><code>skill bump patch</code></td><td>递增版本，同步 <code>SKILL.md</code> + <code>manifest.json</code> + <code>CHANGELOG.md</code></td></tr>
+    <tr><td><code>skill bump minor</code> / <code>major</code></td><td>新增功能 / 破坏性变更</td></tr>
+    <tr><td><code>skill verify</code></td><td>比对本地文件 blob 与远端 GitHub blob</td></tr>
+    <tr><td><code>skill up --yes</code></td><td>一键上架：建仓库 + 开 Pages + 生成网页 + 主页加卡片</td></tr>
+    <tr><td><code>install.sh</code></td><td>引导安装器（<code>curl ... | bash</code>），幂等，装完自动放好 <code>skill</code> 命令</td></tr>
   </tbody>
 </table>
 </div>
