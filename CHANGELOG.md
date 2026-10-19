@@ -3,6 +3,55 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.0] - 2026-10-19
+
+### 修复（6 个真 bug，全部由「拿第三方子目录 skill 实测」暴露）
+
+1. **`--update --target X` 用错坐标，把 X 更新成 self-release 的内容**
+   `if target:` 分支只赋了 `dest`，没调 `_use_skill_dir()`，于是
+   `_remote_coords()` 读的还是脚本自己所在目录的 `.release.json`。
+   实测：`--update --target /tmp/cfec` 把 cfec 目录换成了 self-release 的文件。
+   → target 分支补 `_use_skill_dir()`。
+
+2. **`_flatten_subdir(dest, "")` 崩溃**
+   `os.path.join(dest, "")` 返回 `dest` 自身，于是「把目录搬进自己」抛
+   `FileNotFoundError`。空 subdir 表示 skill 就在仓库根，应直接返回。
+
+3. **tarball 更新分支不探测 subdir**
+   git 分支有 `_detect_subdir()`，tarball 分支没有 → 整个仓库平铺进根目录。
+   两条分支现在行为一致。
+
+4. **`--verify` / `--check` 不能指定 skill**
+   只能靠 `cd` 进目录或 `RELEASE_SKILL_DIR` 环境变量。现在都支持
+   `--verify NAME` / `--check NAME`，包装器同步支持 `skill verify X`。
+
+5. **`run_verify` 里 `git hash-object` 缺 `cwd`**
+   从 `~` 跑 `skill verify X` 时在 `~` 里找文件 → 全部「远端读取失败」。
+   → 补 `cwd=SKILL_DIR`。
+
+6. **subdir 记错无自愈 + README 在仓库根时误报差异**
+   - 新增 `_repair_subdir_cfg()`：根目录有 `SKILL.md` 但恰好一个子目录也有，
+     且坐标记成 `""` → 自动改成子目录并打印修正提示（cfec 正是这个现场）。
+   - `README.md` / `index.html` / `LICENSE` 常放仓库根（面向访客），
+     子目录 404 时回退仓库根再比对。
+   - tarball 摊平后删除残留的同名子目录，否则下次又被当成子目录依据。
+
+### 实测
+
+- `skill verify cfec-thesis-formatter`（从 `~` 跑）→ 5/5 全绿
+- `skill update cfec-thesis-formatter` → 自动探测子目录、摊平、清残留，v2.2.0
+- `--update --target /tmp/fake` → 用对坐标，内容来自 cfec 而非 self-release
+- 边界：不存在的 skill 正确报错；非 skill 目录 verify 提示可给名字
+- 回归：self-release / cfec 的 check / verify / list 全通过
+
+## [1.8.0] - 2026-10-19
+
+### 变更
+
+- （待补充：本次改动内容）
+
+---
+
 ## [1.7.0] - 2026-10-19
 
 ### 修复（4 个真 bug，都是「一句话更新」在真实仓库上跑不通）

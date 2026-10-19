@@ -126,8 +126,9 @@ case "$cmd" in
     check|c)
         rp="$(_release_py)" || exit 1
         if [[ -n "${1:-}" ]]; then
-            export RELEASE_SKILL_DIR="${SKILLS_ROOT}/$1"
-        elif _cwd_is_skill; then
+            exec python3 "$rp" --check "$1"
+        fi
+        if _cwd_is_skill; then
             export RELEASE_SKILL_DIR="$PWD"
         fi
         exec python3 "$rp" --check
@@ -143,7 +144,11 @@ case "$cmd" in
 
     verify|v)
         rp="$(_release_py)" || exit 1
-        _cwd_is_skill || { _err "当前目录不是 skill"; exit 1; }
+        if [[ -n "${1:-}" ]]; then
+            # 给了名字：直接按名字校验，不用 cd 进去
+            exec python3 "$rp" --verify "$1"
+        fi
+        _cwd_is_skill || { _err "当前目录不是 skill（也可以给名字：skill verify <名字>）"; exit 1; }
         export RELEASE_SKILL_DIR="$PWD"
         exec python3 "$rp" --verify
         ;;

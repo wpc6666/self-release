@@ -285,7 +285,12 @@ def apply_bump(part, dry_run=False):
 # ----------------------------------------------------------
 #  --check
 # ----------------------------------------------------------
-def run_check():
+def run_check(target=None, name=None):
+    if target:
+        _use_skill_dir(os.path.abspath(os.path.expanduser(target)))
+    elif name:
+        _use_skill_dir(_skill_dir_by_name(name))
+    _repair_subdir_cfg(SKILL_DIR)
     repo, repo_src = detect_repo()
     version, ver_src = detect_version()
 
@@ -513,9 +518,14 @@ def _write_release_json(dest, repo, branch, subdir):
 def _flatten_subdir(dest, subdir):
     """把仓库里的 subdir 内容搬到 dest 根，并清掉同仓库的兄弟 skill 目录。
 
+    subdir 为空表示 skill 就在仓库根，此时直接返回 —— 否则
+    os.path.join(dest, "") == dest，会自己搬自己并抛 FileNotFoundError。
+
     安装和更新都走这里，避免两处逻辑漂移（之前正是漂移导致
     安装后根目录多了 skill-b、更新后版本不生效）。
     """
+    if not subdir:
+        return
     sub = os.path.join(dest, subdir)
     if os.path.isdir(sub):
         for entry in os.listdir(sub):
@@ -544,15 +554,16 @@ def _flatten_subdir(dest, subdir):
             shutil.rmtree(d, ignore_errors=True)
 
 
-def _detect_subdir(root):
+def _detect_subdir(root, allow_root_files=False):
     """仓库根目录没有 SKILL.md / manifest.json，但恰好有一个子目录有 → 返回该子目录名。
 
     典型场景：cfec-thesis-formatter 把 skill 放在 `重财-论文格式规范/` 下。
     不自动探测的话，装完根目录只有 README.md + 子目录，agent 读不到 SKILL.md，
     版本号也会退化成 commit hash。
     """
-    if os.path.isfile(os.path.join(root, "SKILL.md")) or \
-       os.path.isfile(os.path.join(root, "manifest.json")):
+    if not allow_root_files and (
+            os.path.isfile(os.path.join(root, "SKILL.md")) or
+            os.path.isfile(os.path.join(root, "manifest.json"))):
         return ""
     cands = []
     for entry in sorted(os.listdir(root)):
@@ -563,6 +574,41 @@ def _detect_subdir(root):
            os.path.isfile(os.path.join(sub, "manifest.json")):
             cands.append(entry)
     return cands[0] if len(cands) == 1 else ""
+
+
+def _repair_subdir_cfg(dest):
+    """坐标里 subdir 记错时自愈。
+
+    典型现场：仓库的 skill 在 `重财-论文格式规范/` 下，但 .release.json
+    记成了 ""，于是 verify 去仓库根找 SKILL.md → 404，update 也不摊平。
+    判据：dest 根没有 SKILL.md/manifest.json，且恰好一个子目录有。
+    """
+    cfgp = os.path.join(dest, ".release.json")
+    if not os.path.isfile(cfgp):
+        return None
+    try:
+        with io.open(cfgp, encoding="utf-8") as f:
+            cfg = json.load(f) or {}
+    except Exception:
+        return None
+    if cfg.get("subdir"):
+        return cfg["subdir"]
+    # 判据不能只看「根目录有没有 SKILL.md」：摊平后根目录本来就有，
+    # 但坐标里的 subdir 仍是 ""，verify 会去仓库根找 → 404。
+    # 改为：只要恰好一个子目录也含 SKILL.md/manifest.json，就说明
+    # 仓库里的 skill 在子目录，纠正它。
+    found = _detect_subdir(dest, allow_root_files=True)
+    if not found:
+        return None
+    cfg["subdir"] = found
+    try:
+        with io.open(cfgp, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        print("  修正坐标：subdir 由 \"\" 改为 %s（原先记错，导致更新/校验找错位置）" % found)
+    except Exception:
+        return None
+    return found
 
 
 def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None):
@@ -638,7 +684,9 @@ def run_update(target=None, keep_local=None, name=None):
     会被保留（默认保留 .release.json）。
     """
     if target:
-        dest = os.path.expanduser(target)
+        # 必须切全局 SKILL_DIR，否则 _remote_coords() 读的还是脚本自己
+        # 所在目录的坐标 —— 会把 A skill 更新成 B 仓库的内容（实测踩到）
+        dest = _use_skill_dir(os.path.abspath(os.path.expanduser(target)))
     elif name:
         # 先按 skill 名找；找不到就当作仓库名，转整体更新
         cand = name
@@ -655,6 +703,7 @@ def run_update(target=None, keep_local=None, name=None):
     else:
         dest = SKILL_DIR
 
+    _repair_subdir_cfg(dest)
     repo, branch, subdir, skill_id = _remote_coords()
     if not repo:
         _err("skill 配置里没有仓库坐标，无法自动更新。请先跑 --init <repo_url> 钉死坐标。")
@@ -706,6 +755,12 @@ def run_update(target=None, keep_local=None, name=None):
         if not roots:
             _err("压缩包结构异常")
         srcroot = os.path.join(tmpd, roots[0])
+        # 与 git 分支对齐：subdir 没记录时也要自动探测，否则根目录
+        # 会把整个仓库（含子目录）平铺进来，skill 内容读不到
+        if not subdir:
+            subdir = _detect_subdir(srcroot)
+            if subdir:
+                print("  自动探测到 skill 在子目录：%s" % subdir)
         if subdir:
             srcroot = os.path.join(srcroot, subdir)
         for name in os.listdir(srcroot):
@@ -717,6 +772,11 @@ def run_update(target=None, keep_local=None, name=None):
                 shutil.copytree(s, d)
             else:
                 shutil.copy2(s, d)
+        # 摊平后必须删掉 dest 里残留的同名子目录，否则下次又会被当成
+        # 「skill 在子目录」的依据，且文件是旧副本（实测 cfec 踩到）
+        stale = os.path.join(dest, subdir) if subdir else None
+        if stale and os.path.isdir(stale):
+            shutil.rmtree(stale, ignore_errors=True)
         shutil.rmtree(tmpd, ignore_errors=True)
 
     # 还原保留文件
@@ -921,7 +981,12 @@ def run_list():
 # ----------------------------------------------------------
 #  --verify：本地与远端 blob 一致性
 # ----------------------------------------------------------
-def run_verify():
+def run_verify(target=None, name=None):
+    if target:
+        _use_skill_dir(os.path.abspath(os.path.expanduser(target)))
+    elif name:
+        _use_skill_dir(_skill_dir_by_name(name))
+    _repair_subdir_cfg(SKILL_DIR)
     repo, _ = detect_repo()
     if not repo:
         _err("未定位到仓库地址，无法比对")
@@ -948,6 +1013,10 @@ def run_verify():
             return 0
         rel_dir = os.path.relpath(SKILL_DIR, git_root)
 
+    # README.md / index.html 常放在仓库根（面向访客），而 skill 内容在子目录。
+    # 这两个文件先按子目录找，404 再回退仓库根，否则子目录 skill 永远报差异。
+    ROOT_FALLBACK = ("README.md", "index.html", "LICENSE")
+
     ok = True
     for fname in ("SKILL.md", "manifest.json", "CHANGELOG.md", "README.md",
                   "scripts/release.py"):
@@ -956,11 +1025,19 @@ def run_verify():
             continue
         rel = fname if rel_dir == "." else "%s/%s" % (rel_dir, fname)
 
-        rc, local_blob, _ = _run(["git", "hash-object", fname])
-        if rc != 0:
+        # 必须 cwd=SKILL_DIR：否则 git hash-object 在调用者的当前目录
+        # 找文件，从 ~ 里跑 `skill verify X` 会全部「远端读取失败」
+        rc, local_blob, _ = _run(["git", "hash-object", fname], cwd=SKILL_DIR)
+        if rc != 0 or not local_blob:
+            print("  %-14s ⚠️  本地文件无法计算 blob" % fname)
+            ok = False
             continue
         q = "repos/%s/%s/contents/%s" % (owner, name, rel)
         rc2, remote_sha, _ = _run(["gh", "api", q, "--jq", ".sha"])
+        if (rc2 != 0 or not remote_sha) and fname in ROOT_FALLBACK and rel_dir != ".":
+            # 回退：该文件在仓库根
+            q2 = "repos/%s/%s/contents/%s" % (owner, name, fname)
+            rc2, remote_sha, _ = _run(["gh", "api", q2, "--jq", ".sha"])
         if rc2 != 0 or not remote_sha:
             print("  %-14s ⚠️  远端读取失败（未推送或路径不对）" % fname)
             ok = False
@@ -982,14 +1059,14 @@ def run_verify():
 def main(argv=None):
     p = argparse.ArgumentParser(
         description="Skill 发布辅助：自动定位 GitHub 仓库与版本")
-    p.add_argument("--check", action="store_true",
-                   help="定位并显示仓库、当前版本、最近 tag、分支与同步状态")
+    p.add_argument("--check", nargs="?", const=True, metavar="SKILL",
+                   help="定位并显示仓库/版本/分支；可只给名字：--check NAME")
     p.add_argument("--bump", choices=["major", "minor", "patch"],
                    help="递增版本并同步 SKILL.md / manifest.json / CHANGELOG.md")
     p.add_argument("--dry-run", action="store_true",
                    help="与 --bump 联用：只预览，不写文件")
-    p.add_argument("--verify", action="store_true",
-                   help="比对本地与远端 GitHub blob 是否一致")
+    p.add_argument("--verify", nargs="?", const=True, metavar="SKILL",
+                   help="比对本地与远端 GitHub blob；可只给名字：--verify NAME")
     p.add_argument("--init", metavar="REPO_URL",
                    help="钉死仓库坐标，写入 .release.json（之后 --check 不再需要猜）")
     p.add_argument("--branch", help="配合 --init：显式指定分支名（fork 仓库常为 master）")
@@ -1012,12 +1089,14 @@ def main(argv=None):
         return write_release_cfg(a.init, branch=a.branch, subdir=a.subdir,
                                  target=a.target)
     if a.check:
-        return run_check()
+        return run_check(target=a.target,
+                         name=None if a.check is True else a.check)
     if a.bump:
         apply_bump(a.bump, dry_run=a.dry_run)
         return 0
     if a.verify:
-        return run_verify()
+        return run_verify(target=a.target,
+                          name=None if a.verify is True else a.verify)
     if a.install:
         return run_install(target=a.target,
                            name=None if a.install is True else a.install,
