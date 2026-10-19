@@ -39,6 +39,7 @@ import re
 import sys
 import json
 import datetime
+import shutil
 import subprocess
 import argparse
 
@@ -445,10 +446,16 @@ def _remote_coords():
 
 
 def _normalize_repo(repo):
-    """把各种写法的仓库地址规整成 https 形式。"""
+    """把各种写法的仓库地址规整成 https 形式。
+
+    本地路径（/tmp/x、./x、~/x、file://）保持原样——给它们补 .git 会变成不存在的路径。
+    """
     r = (repo or "").strip()
     if r.startswith("git@"):
         r = r.replace(":", "/", 1).replace("git@", "https://", 1)
+    # 本地路径 / file:// 不规整
+    if r.startswith(("/", "./", "../", "~", "file://")):
+        return r
     if not r.endswith(".git"):
         r = r.rstrip("/") + ".git"
     return r
@@ -503,6 +510,61 @@ def _write_release_json(dest, repo, branch, subdir):
     return cfgp
 
 
+def _flatten_subdir(dest, subdir):
+    """把仓库里的 subdir 内容搬到 dest 根，并清掉同仓库的兄弟 skill 目录。
+
+    安装和更新都走这里，避免两处逻辑漂移（之前正是漂移导致
+    安装后根目录多了 skill-b、更新后版本不生效）。
+    """
+    sub = os.path.join(dest, subdir)
+    if os.path.isdir(sub):
+        for entry in os.listdir(sub):
+            src_p = os.path.join(sub, entry)
+            dst_p = os.path.join(dest, entry)
+            if os.path.isdir(src_p):
+                if os.path.isdir(dst_p):
+                    shutil.rmtree(dst_p)
+                shutil.move(src_p, dst_p)
+            else:
+                shutil.move(src_p, dst_p)
+        try:
+            if not os.listdir(sub):
+                os.rmdir(sub)
+        except OSError:
+            pass
+    # 清掉兄弟 skill 目录（标志：里面有 SKILL.md 或 manifest.json）
+    for entry in os.listdir(dest):
+        if entry in (".git", subdir) or entry.startswith("."):
+            continue
+        d = os.path.join(dest, entry)
+        if not os.path.isdir(d):
+            continue
+        if os.path.isfile(os.path.join(d, "SKILL.md")) or \
+           os.path.isfile(os.path.join(d, "manifest.json")):
+            shutil.rmtree(d, ignore_errors=True)
+
+
+def _detect_subdir(root):
+    """仓库根目录没有 SKILL.md / manifest.json，但恰好有一个子目录有 → 返回该子目录名。
+
+    典型场景：cfec-thesis-formatter 把 skill 放在 `重财-论文格式规范/` 下。
+    不自动探测的话，装完根目录只有 README.md + 子目录，agent 读不到 SKILL.md，
+    版本号也会退化成 commit hash。
+    """
+    if os.path.isfile(os.path.join(root, "SKILL.md")) or \
+       os.path.isfile(os.path.join(root, "manifest.json")):
+        return ""
+    cands = []
+    for entry in sorted(os.listdir(root)):
+        sub = os.path.join(root, entry)
+        if not os.path.isdir(sub) or entry.startswith("."):
+            continue
+        if os.path.isfile(os.path.join(sub, "SKILL.md")) or \
+           os.path.isfile(os.path.join(sub, "manifest.json")):
+            cands.append(entry)
+    return cands[0] if len(cands) == 1 else ""
+
+
 def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None):
     """从 skill 配置里的坐标安装（或修复）本 skill。
 
@@ -551,17 +613,16 @@ def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None
     if rc != 0:
         _err("git clone 失败：%s" % (err or out))
 
+    # 子目录处理：显式给了 subdir 就用它；没给则自动探测
+    # （仓库根目录没有 SKILL.md/manifest.json、但恰好有一个子目录有 → 认它是 skill 目录）
+    if not subdir:
+        subdir = _detect_subdir(dest)
+        if subdir:
+            print("  自动探测到 skill 在子目录：%s" % subdir)
     if subdir:
-        # skill 在仓库子目录：把子目录内容上移
-        sub = os.path.join(dest, subdir)
-        if not os.path.isdir(sub):
+        if not os.path.isdir(os.path.join(dest, subdir)):
             _err("仓库里找不到子目录 %s" % subdir)
-        for name in os.listdir(sub):
-            src_p = os.path.join(sub, name)
-            dst_p = os.path.join(dest, name)
-            if os.path.exists(dst_p):
-                continue
-            os.rename(src_p, dst_p)
+        _flatten_subdir(dest, subdir)
 
     cfgp = _write_release_json(dest, repo, branch, subdir)
     print("✅ 已安装到 %s" % dest)
@@ -579,6 +640,17 @@ def run_update(target=None, keep_local=None, name=None):
     if target:
         dest = os.path.expanduser(target)
     elif name:
+        # 先按 skill 名找；找不到就当作仓库名，转整体更新
+        cand = name
+        if not os.path.isabs(cand) and os.sep not in cand:
+            cand = os.path.join(SKILLS_ROOT, name)
+        cand = os.path.abspath(os.path.expanduser(cand))
+        if not os.path.isdir(cand):
+            hits = _scan_skills_by_repo(name_hint=name)
+            if hits:
+                print("「%s」不是 skill 名，识别为仓库名 → 更新该仓库下全部 skill" % name)
+                print()
+                return run_update_repo(name=name, target=None)
         dest = _use_skill_dir(_skill_dir_by_name(name))
     else:
         dest = SKILL_DIR
@@ -613,9 +685,13 @@ def run_update(target=None, keep_local=None, name=None):
         rc, out, err = _run(["git", "reset", "--hard", "origin/" + branch], cwd=dest)
         if rc != 0:
             _err("git reset 失败：%s" % (err or out))
+        # 子目录场景：git 还原会把内容放回子目录，更新后必须再摊平一次
+        if subdir:
+            _flatten_subdir(dest, subdir)
+
     else:
         # 非 git 目录：下载 tarball 覆盖
-        import tempfile, tarfile, shutil, urllib.request
+        import tempfile, tarfile, urllib.request
         tmpd = tempfile.mkdtemp()
         tgz = os.path.join(tmpd, "s.tgz")
         dl = url.replace(".git", "").replace("https://github.com/",
@@ -669,37 +745,79 @@ def run_update(target=None, keep_local=None, name=None):
     return 0
 
 
+def _scan_skills_by_repo(want_repo=None, name_hint=None):
+    """扫描已装 skill，返回 [(名字, 目录, .release.json 内容)]。
+
+    给了 want_repo 就只留坐标匹配的；给了 name_hint 则匹配
+    目录名 / manifest id / 仓库名（去 .git 后的最后一段）。
+    """
+    out = []
+    if not os.path.isdir(SKILLS_ROOT):
+        return out
+    for n in sorted(os.listdir(SKILLS_ROOT)):
+        d = os.path.join(SKILLS_ROOT, n)
+        if not os.path.isdir(d) or n.startswith("."):
+            continue
+        cfgp = os.path.join(d, ".release.json")
+        if not os.path.isfile(cfgp):
+            continue
+        try:
+            with io.open(cfgp, encoding="utf-8") as f:
+                c = json.load(f) or {}
+        except Exception:
+            continue
+        repo = c.get("repo") or ""
+        if want_repo is not None and _normalize_repo(repo) != want_repo:
+            continue
+        if name_hint:
+            slug = re.sub(r"\.git$", "", (repo or "").rstrip("/").split("/")[-1])
+            mid = ""
+            mp = os.path.join(d, "manifest.json")
+            if os.path.isfile(mp):
+                try:
+                    with io.open(mp, encoding="utf-8") as f:
+                        mid = (json.load(f) or {}).get("id") or ""
+                except Exception:
+                    pass
+            if name_hint not in (n, slug, mid):
+                continue
+        out.append((n, d, c))
+    return out
+
+
 def run_update_repo(name=None, target=None):
     """更新「整个仓库」：把同一仓库下的所有已装 skill 全部更新。
 
-    用户说「更新这个仓库的 skill」时用。先按 name 解析出仓库坐标，
-    再扫描 SKILLS_ROOT 找出坐标相同的所有 skill，逐个更新。
+    用户说「更新 <仓库名>」时用。name 可以是：
+      - 某个已装 skill 的名字（取它的仓库坐标，再找同仓库的兄弟）
+      - 仓库名（如 fakerepo / cfec-thesis-formatter），直接按仓库名匹配
     """
     if target:
         _use_skill_dir(os.path.expanduser(target))
+        repo, branch, subdir, skill_id = _remote_coords()
     elif name:
-        _use_skill_dir(_skill_dir_by_name(name))
-    repo, branch, subdir, skill_id = _remote_coords()
+        # 先判断是不是已装的 skill 目录（不能用 _skill_dir_by_name，它会 sys.exit）
+        cand = name
+        if not os.path.isabs(cand) and os.sep not in cand:
+            cand = os.path.join(SKILLS_ROOT, name)
+        cand = os.path.abspath(os.path.expanduser(cand))
+        if os.path.isdir(cand):
+            _use_skill_dir(cand)
+            repo, branch, subdir, skill_id = _remote_coords()
+        else:
+            # 不是 skill 目录 → 当作仓库名
+            hits = _scan_skills_by_repo(name_hint=name)
+            if not hits:
+                _err("找不到 skill 或仓库：%s\n用 --list 看已装的 skill 与仓库名" % name)
+            _use_skill_dir(hits[0][1])
+            repo, branch, subdir, skill_id = _remote_coords()
+    else:
+        repo, branch, subdir, skill_id = _remote_coords()
     if not repo:
         _err("没有仓库坐标，无法按仓库更新。请先跑 --init <repo_url>。")
     want = _normalize_repo(repo)
 
-    peers = []
-    if os.path.isdir(SKILLS_ROOT):
-        for n in sorted(os.listdir(SKILLS_ROOT)):
-            d = os.path.join(SKILLS_ROOT, n)
-            if not os.path.isdir(d) or n.startswith("."):
-                continue
-            cfgp = os.path.join(d, ".release.json")
-            if not os.path.isfile(cfgp):
-                continue
-            try:
-                with io.open(cfgp, encoding="utf-8") as f:
-                    c = json.load(f) or {}
-            except Exception:
-                continue
-            if _normalize_repo(c.get("repo")) == want:
-                peers.append(n)
+    peers = [n for (n, _d, _c) in _scan_skills_by_repo(want_repo=want)]
 
     print("== 按仓库更新 ==")
     print("仓库 : %s" % want)

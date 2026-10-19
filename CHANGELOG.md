@@ -3,6 +3,46 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.7.0] - 2026-10-19
+
+### 修复（4 个真 bug，都是「一句话更新」在真实仓库上跑不通）
+
+1. **子目录 skill 安装后根目录没有 SKILL.md**
+   `cfec-thesis-formatter` 把 skill 放在 `重财-论文格式规范/` 下，装完根目录只有
+   `README.md` + 子目录 → agent 读不到说明，版本号退化成 commit hash。
+   新增 `_detect_subdir()`：根目录无 `SKILL.md`/`manifest.json` 且恰好一个子目录
+   有时，自动认它并摊平上移。
+
+2. **`_normalize_repo` 给本地路径强加 `.git`**
+   `skill install x --from-repo /tmp/repo` 被改成 `/tmp/repo.git` → clone 失败。
+   本地路径（`/`、`./`、`../`、`~`、`file://`）现在保持原样。
+
+3. **`skill update <仓库名>` 不生效**
+   走的是 `--update` 而非 `--update-repo`，找不到目录直接退出。
+   `run_update` 现在会回退：名字不是已装 skill → 当作仓库名 → 转整体更新。
+
+4. **子目录 skill 更新后版本不生效 + 兄弟目录污染**
+   `git reset --hard` 只更新仓库根，skill 内容仍在子目录里；且同仓库的其它
+   skill 目录会混进来。抽出 `_flatten_subdir()`，安装和更新共用同一套摊平逻辑
+   （`shutil.move` + 清理兄弟 skill 目录），消除两处逻辑漂移。
+
+### 实测
+
+- 全新 HOME：`curl install.sh | bash` → `skill list` 正常
+- `skill install cfec-thesis-formatter --from-repo ...` → 自动探测子目录，
+  版本正确解析 v2.2.0
+- 双 skill 同仓库（`/tmp/fakerepo` 的 skill-a / skill-b）：
+  安装互不污染；`skill update fakerepo` 一次更新两个，版本都到 1.2.0
+- 回归：self-release / cfec 的 check、install、update、list 全绿
+
+## [1.7.0] - 2026-10-19
+
+### 变更
+
+- （待补充：本次改动内容）
+
+---
+
 ## [1.6.0] - 2026-10-19
 
 ### 新增
