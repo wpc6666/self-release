@@ -3,6 +3,35 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.0] - 2026-10-19
+
+### 新增：一键上架（`scripts/new_repo.py`）
+
+说「把这个 skill 上架」就走完全流程，不用手工建仓库、开 Pages、写网页、改主页：
+
+| 步骤 | 动作 |
+|---|---|
+| 1 | `gh repo create` 建公开仓库并推送 |
+| 2 | 用 `templates/page.html` 套 `manifest.json` 生成 `index.html` |
+| 3 | 提交并推送 |
+| 4 | `gh api .../pages` 开 GitHub Pages |
+| 5 | `gh repo edit` 写 About 描述与 topics |
+| 6 | 克隆主页仓库，按分区插入卡片后推送 |
+
+- 默认 **预览模式**，加 `--yes` 才真执行。
+- `--no-homepage` / `--no-pages` / `--no-about` 可跳过任一步。
+- `--section` 模糊匹配主页分区（学习知识库 / 工具项目 / 其他工具，默认工具项目）。
+- 幂等：仓库已存在则跳过创建，Pages 已开则跳过，主页已有卡片则跳过。
+
+### 新增：页面模板（`templates/page.html`）
+
+- 移动端优先：`viewport-fit=cover`、表格横滑容器、`min-width:340px`、768px 与 380px 两档断点。
+- 实测 320 / 360 / 375 / 390 / 430 / 768 六档零溢出。
+
+### 说明
+
+`sync.sh audit` **只核查不修复**——发现主页漏卡片只打印提示，不会自己改。要自动补卡片用本版的 `new_repo.py`。
+
 ## [1.3.2] - 2026-10-19
 
 ### 修复

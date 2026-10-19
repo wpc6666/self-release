@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -94,6 +94,29 @@ skill                 版本   仓库                                           
 cfec-thesis-formatter 2.2.0  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
 self-release          1.1.0  https://github.com/wpc6666/self-release.git         main
 ```
+
+## 一键上架（新 skill）
+
+说一句「把这个 skill 上架」，从零到能访问全自动：
+
+```bash
+cd <你的skill目录>
+python3 <self-release>/scripts/new_repo.py --dry-run   # 预览
+python3 <self-release>/scripts/new_repo.py --yes       # 执行
+```
+
+六步：建仓库 → 生成网页 → 推送 → 开 Pages → 写 About → 主页加卡片。
+
+| 参数 | 作用 |
+|---|---|
+| `--dry-run`（默认） | 只预览，不改任何东西 |
+| `--yes` | 真执行 |
+| `--no-homepage` | 不动公开主页 |
+| `--section 学习知识库` | 指定主页分区，默认「工具项目」 |
+
+前置：`gh auth status` 通过 + skill 目录有 `manifest.json`。
+
+> **`sync.sh audit` 只核查不修复**——它发现主页漏卡片只会打印提示，不会自己改。要自动补用 `new_repo.py`。
 
 ## 全部命令
 

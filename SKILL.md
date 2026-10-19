@@ -1,7 +1,7 @@
 ---
 name: self-release
-version: 1.3.2
-description: 当用户说「更新这个 skill / 发布这个 skill / 升级脚本到 GitHub / 打个 tag 推上去 / 安装这个 skill」时使用。自动定位目标 skill 对应的 GitHub 仓库、当前版本、最近 tag 与本地分支状态，然后按标准流程完成：版本递增（patch/minor/major，同步 SKILL.md + manifest.json + CHANGELOG.md 三处）→ 本地验证 → 本地与仓库 clone 一致性比对 → 提交推送（署名白澤 程）→ 打 tag → 汇报。也支持按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
+version: 1.4.0
+description: 当用户说「更新这个 skill / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（三处元数据同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
 
@@ -247,6 +247,41 @@ gh api repos/<user>/<repo>/contents/<path> --jq '.sha'   # 远端 blob，必须�
 5. **剩余风险 / 待办**
 
 ---
+
+## 一键上架（新 skill 从零到能访问）
+
+用户说「把这个 skill 上架 / 发布到 GitHub / 上线」，跑：
+
+```bash
+cd <skill目录>
+python3 <self-release>/scripts/new_repo.py --dry-run    # 先看要做什么
+python3 <self-release>/scripts/new_repo.py --yes        # 真执行
+```
+
+**六步全自动**：
+
+| 步 | 动作 | 幂等行为 |
+|---|---|---|
+| 1 | `gh repo create` 建公开仓库并推送 | 仓库已存在则跳过 |
+| 2 | 套 `templates/page.html` 生成 `index.html` | 每次重新生成 |
+| 3 | 提交并推送 | 无改动则跳过提交 |
+| 4 | `gh api .../pages` 开 Pages | 已开则跳过 |
+| 5 | `gh repo edit` 写 About + topics | 覆盖式更新 |
+| 6 | 克隆主页仓库插入卡片并推送 | 已有卡片则跳过 |
+
+**可选参数**：
+
+| 参数 | 作用 |
+|---|---|
+| `--dry-run`（默认） | 只打印将要执行的命令，不改任何东西 |
+| `--yes` | 真正执行 |
+| `--no-homepage` | 跳过主页卡片（不想动公开主页时用） |
+| `--no-pages` / `--no-about` | 跳过开 Pages / 写 About |
+| `--section 学习知识库` | 指定主页分区，默认「工具项目」 |
+
+**前置条件**：`gh auth status` 通过；skill 目录里有 `manifest.json`（提供 id / name / description / version / tags）。
+
+> ⚠️ **`sync.sh audit` 只核查不修复**。它发现主页漏卡片只会打印「补主页卡片：编辑 ... 后 push」，不会自己改。要自动补用 `new_repo.py`。
 
 ## 「一句话更新」到底怎么成立的
 

@@ -1,0 +1,437 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+skill 一键上架（new_repo.py）—— 建仓库 → 开 Pages → 生成网页 → 加主页卡片
+================================================================
+
+配合 release.py 使用。当用户说「把这个 skill 发布到 GitHub / 上架 / 上线」时：
+
+    1. gh repo create            建公开仓库
+    2. 推送本地文件              git init + add + commit + push
+    3. gh api .../pages          开 GitHub Pages
+    4. 生成 index.html           用 templates/page.html 套 manifest.json
+    5. gh repo edit              写 About 描述 + topics
+    6. 克隆主页仓库并插入卡片      wpc6666.github.io/index.html 自动加卡片后推送
+
+用法：
+    python3 scripts/new_repo.py --dry-run           # 预览将执行的全部动作
+    python3 scripts/new_repo.py --yes               # 真正执行（全自动）
+    python3 scripts/new_repo.py --no-homepage --yes # 跳过主页卡片
+    python3 scripts/new_repo.py --section "工具项目" --yes  # 指定主页分区
+
+前置：gh 已登录（gh auth status 通过）；本机 git 身份为 白澤 程。
+"""
+
+import io
+import os
+import re
+import sys
+import json
+import time
+import shutil
+import subprocess
+import argparse
+
+AUTHOR_NAME = "白澤 程"
+AUTHOR_EMAIL = "87405429+wpc6666@users.noreply.github.com"
+OWNER = "wpc6666"
+HOMEPAGE_REPO = "wpc6666.github.io"
+HOMEPAGE_URL = "https://%s.github.io/" % OWNER
+
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 主页分区关键词 → 该分区标题（用于 --section 模糊匹配）
+SECTIONS = ["学习知识库", "工具项目", "其他工具"]
+
+
+def _err(msg):
+    sys.stderr.write("错误: %s\n" % msg)
+    sys.exit(1)
+
+
+def _warn(msg):
+    sys.stderr.write("警告: %s\n" % msg)
+
+
+def _info(msg):
+    print(msg)
+
+
+def _run(cmd, cwd=None, timeout=120):
+    """跑命令，返回 (rc, stdout, stderr)。"""
+    try:
+        p = subprocess.run(cmd, cwd=cwd or SKILL_DIR,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           text=True, timeout=timeout)
+        return p.returncode, p.stdout.strip(), p.stderr.strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def _read_manifest():
+    path = os.path.join(SKILL_DIR, "manifest.json")
+    if not os.path.isfile(path):
+        _err("找不到 manifest.json —— 上架需要它提供 id / name / description 等元数据")
+    with io.open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _slug(mf):
+    """仓库名：优先 manifest 的 id。"""
+    return mf.get("id") or os.path.basename(SKILL_DIR)
+
+
+def _has_gh():
+    rc, _, _ = _run(["gh", "auth", "status"])
+    return rc == 0
+
+
+def _repo_exists(slug):
+    rc, _, _ = _run(["gh", "repo", "view", "%s/%s" % (OWNER, slug)])
+    return rc == 0
+
+
+# ----------------------------------------------------------
+#  1. 建仓库 + 推送
+# ----------------------------------------------------------
+def step_create_repo(slug, mf, dry_run):
+    _info("\n[1/6] 建仓库 %s/%s" % (OWNER, slug))
+    if _repo_exists(slug):
+        _info("  仓库已存在，跳过创建")
+        return False
+    if dry_run:
+        _info("  [dry-run] gh repo create %s/%s --public --source=. --push" % (OWNER, slug))
+        return True
+
+    # 确保本地是 git 仓库且有正确身份
+    if not os.path.isdir(os.path.join(SKILL_DIR, ".git")):
+        _run(["git", "init", "-b", "main"], cwd=SKILL_DIR)
+    _run(["git", "config", "user.name", AUTHOR_NAME], cwd=SKILL_DIR)
+    _run(["git", "config", "user.email", AUTHOR_EMAIL], cwd=SKILL_DIR)
+
+    rc, out, err = _run(
+        ["gh", "repo", "create", slug, "--public",
+         "--description", mf.get("description", "")[:350],
+         "--source", ".", "--remote", "origin", "--push"],
+        cwd=SKILL_DIR)
+    if rc != 0:
+        _err("建仓库失败：%s" % (err or out))
+    _info("  ✓ 已创建 https://github.com/%s/%s" % (OWNER, slug))
+    return True
+
+
+# ----------------------------------------------------------
+#  2. 生成 index.html
+# ----------------------------------------------------------
+def step_gen_page(slug, mf, dry_run):
+    _info("\n[2/6] 生成 index.html")
+    tpl_path = os.path.join(SKILL_DIR, "templates", "page.html")
+    if not os.path.isfile(tpl_path):
+        _warn("  没有 templates/page.html，跳过网页生成")
+        return False
+
+    with io.open(tpl_path, encoding="utf-8") as f:
+        tpl = f.read()
+
+    desc = mf.get("description", "")
+    # 徽章里的版本号
+    ver = mf.get("version", "1.0.0")
+    lic = mf.get("license", "MIT")
+
+    # 安装命令：优先 manifest.install.command
+    inst = mf.get("install") or {}
+    inst_cmd = inst.get("command") or (
+        "git clone https://github.com/%s/%s.git" % (OWNER, slug))
+
+    # 流程箭头
+    flow_items = ["说一句话", "定位仓库与版本", "递增版本", "验证", "推送打 tag"]
+    flow_html = '\n  <span class="arrow">→</span>\n'.join(
+        '  <span>%s</span>' % x for x in flow_items)
+
+    # 命令表
+    cmds = [
+        ("--check", "定位仓库、当前版本、最近 tag、分支状态"),
+        ("--bump patch|minor|major", "递增版本并同步 SKILL.md / manifest.json / CHANGELOG.md"),
+        ("--verify", "比对本地与远端 GitHub blob 是否一致"),
+        ("--init <repo_url>", "钉死仓库坐标，写入 .release.json"),
+        ("--install", "按配置坐标安装（新机器首次）"),
+        ("--update", "按配置坐标拉取最新版"),
+        ("--list", "列出所有已装 skill 及其仓库坐标"),
+    ]
+    cmd_rows = "\n".join(
+        "<tr><td><code>%s</code></td><td>%s</td></tr>" % (c, d) for c, d in cmds)
+
+    # 配置字段表
+    cfgs = [
+        (".release.json", "仓库坐标（repo / branch / subdir），提供后永久免问链接"),
+        ("manifest.json", "版本、描述、install 命令、files 清单"),
+        ("SKILL.md", "frontmatter 里的 version，供 agent 判断当前版本"),
+        ("CHANGELOG.md", "版本历史，--bump 时自动追加条目"),
+    ]
+    cfg_rows = "\n".join(
+        "<tr><td><code>%s</code></td><td>%s</td></tr>" % (c, d) for c, d in cfgs)
+
+    related = [
+        ("macOS 中文绘图配置", "https://github.com/%s/plot-cjk-config" % OWNER,
+         "R / Python / Stata 中文出图，300 DPI，不出豆腐块"),
+        ("全局行为准则", "https://github.com/%s/dsh-agents" % OWNER,
+         "跨工具 AGENTS.md，符号链接分发到 DSH / Codex / Claude"),
+    ]
+    related_html = "\n".join(
+        '<li><a href="%s">%s</a> —— %s</li>' % (u, n, d) for n, u, d in related)
+
+    tagline = mf.get("name") or slug
+    page = (tpl
+            .replace("{{NAME}}", slug)
+            .replace("{{TAGLINE}}", tagline)
+            .replace("{{DESC_SHORT}}", desc[:150].replace('"', "&quot;"))
+            .replace("{{DESC_LONG}}", desc)
+            .replace("{{VERSION}}", ver)
+            .replace("{{LICENSE}}", lic)
+            .replace("{{AUTHOR}}", AUTHOR_NAME)
+            .replace("{{OWNER}}", OWNER)
+            .replace("{{SLUG}}", slug)
+            .replace("{{YEAR}}", str(__import__("datetime").date.today().year))
+            .replace("{{INSTALL_CMD}}", inst_cmd)
+            .replace("{{FLOW_HTML}}", flow_html)
+            .replace("{{CMD_ROWS}}", cmd_rows)
+            .replace("{{CFG_ROWS}}", cfg_rows)
+            .replace("{{RELATED_HTML}}", related_html))
+
+    out = os.path.join(SKILL_DIR, "index.html")
+    if dry_run:
+        _info("  [dry-run] 写入 %s（%d 字节）" % (out, len(page)))
+        return False
+    with io.open(out, "w", encoding="utf-8") as f:
+        f.write(page)
+    _info("  ✓ 已生成 index.html（%d 字节）" % len(page))
+    return True
+
+
+# ----------------------------------------------------------
+#  3. 提交并推送（含 index.html）
+# ----------------------------------------------------------
+def step_push(slug, dry_run):
+    _info("\n[3/6] 提交并推送")
+    if dry_run:
+        _info("  [dry-run] git add -A && git commit && git push")
+        return False
+    rc, out, err = _run(["git", "add", "-A"], cwd=SKILL_DIR)
+    rc, out, err = _run(["git", "status", "--porcelain"], cwd=SKILL_DIR)
+    if not out.strip():
+        _info("  没有改动，跳过提交")
+    else:
+        rc, out, err = _run(
+            ["git", "commit", "-m", "docs: 生成 skill 说明页 index.html"], cwd=SKILL_DIR)
+        if rc != 0:
+            _err("提交失败：%s" % (err or out))
+    rc, out, err = _run(["git", "push", "-u", "origin", "main"], cwd=SKILL_DIR)
+    if rc != 0 and "already up-to-date" not in (out + err).lower():
+        _warn("  推送返回非零：%s" % (err or out))
+    else:
+        _info("  ✓ 已推送")
+    return True
+
+
+# ----------------------------------------------------------
+#  4. 开 Pages
+# ----------------------------------------------------------
+def step_pages(slug, dry_run):
+    _info("\n[4/6] 开启 GitHub Pages")
+    rc, out, _ = _run(["gh", "api", "repos/%s/%s/pages" % (OWNER, slug)])
+    if rc == 0:
+        _info("  Pages 已开启，跳过")
+        return False
+    if dry_run:
+        _info("  [dry-run] gh api -X POST repos/%s/%s/pages -f 'source[branch]=main' -f 'source[path]=/'" % (OWNER, slug))
+        return True
+    rc, out, err = _run(
+        ["gh", "api", "-X", "POST", "repos/%s/%s/pages" % (OWNER, slug),
+         "-f", "source[branch]=main", "-f", "source[path]=/"])
+    if rc != 0:
+        _warn("  开 Pages 失败（可能需等推送完成）：%s" % (err or out))
+        return False
+    _info("  ✓ Pages 已开启：https://%s.github.io/%s/" % (OWNER, slug))
+    return True
+
+
+# ----------------------------------------------------------
+#  5. 写 About（描述 + topics）
+# ----------------------------------------------------------
+def step_about(slug, mf, dry_run):
+    _info("\n[5/6] 写 About 描述与 topics")
+    desc = mf.get("description", "")[:350]
+    tags = (mf.get("tags") or [])[:12]
+    if dry_run:
+        _info("  [dry-run] gh repo edit --description ... --add-topic %s" % " ".join(tags))
+        return False
+    cmd = ["gh", "repo", "edit", "%s/%s" % (OWNER, slug), "--description", desc]
+    for t in tags:
+        cmd += ["--add-topic", re.sub(r"[^a-z0-9-]", "-", str(t).lower())]
+    rc, out, err = _run(cmd)
+    if rc != 0:
+        _warn("  写 About 失败：%s" % (err or out))
+        return False
+    _info("  ✓ 已写 About（%d 个 topic）" % len(tags))
+    return True
+
+
+# ----------------------------------------------------------
+#  6. 主页卡片
+# ----------------------------------------------------------
+def _pick_section(section_hint):
+    """把用户给的 --section 模糊匹配到主页已有分区标题。"""
+    if section_hint:
+        for s in SECTIONS:
+            if section_hint in s or s in section_hint:
+                return s
+    return "工具项目"
+
+
+def _build_card(slug, mf):
+    name = mf.get("name") or slug
+    desc = mf.get("description", "")[:200]
+    return """                <div class="repo-card">
+                    <div class="repo-name">%s</div>
+                    <div class="repo-desc">%s</div>
+                    <a href="https://%s.github.io/%s/" class="repo-link" target="_blank">在线查看</a>
+                    <a href="https://github.com/%s/%s" class="repo-link" target="_blank" style="background: #24292e; margin-left: 8px;">GitHub</a>
+                </div>
+""" % (name, desc, OWNER, slug, OWNER, slug)
+
+
+def step_homepage(slug, mf, section_hint, dry_run):
+    _info("\n[6/6] 插入主页卡片")
+    tmp = os.path.join("/tmp", "homepage_%d" % os.getpid())
+    if os.path.isdir(tmp):
+        shutil.rmtree(tmp)
+    rc, out, err = _run(["git", "clone", "--depth", "1",
+                         "https://github.com/%s/%s.git" % (OWNER, HOMEPAGE_REPO), tmp],
+                        cwd="/tmp", timeout=120)
+    if rc != 0:
+        _warn("  克隆主页仓库失败，跳过：%s" % (err or out))
+        return False
+
+    idx = os.path.join(tmp, "index.html")
+    if not os.path.isfile(idx):
+        _warn("  主页没有 index.html，跳过")
+        return False
+    with io.open(idx, encoding="utf-8") as f:
+        html = f.read()
+
+    if 'github.com/%s/%s"' % (OWNER, slug) in html:
+        _info("  主页已有该仓库卡片，跳过")
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+
+    section = _pick_section(section_hint)
+    card = _build_card(slug, mf)
+
+    # 找到目标分区的 repo-grid，插在它的最后一个 </div> 之前
+    marker = '<h2 class="section-title">'
+    pos = html.find(marker)
+    target_grid_end = None
+    while pos != -1:
+        line_end = html.find("</h2>", pos)
+        title = html[pos + len(marker):line_end]
+        if section in title:
+            grid = html.find('<div class="repo-grid">', line_end)
+            if grid == -1:
+                break
+            # 从 grid 开始找配对的 </div>（缩进 12 空格那个 = grid 闭合）
+            close = html.find("\n            </div>", grid)
+            if close == -1:
+                break
+            target_grid_end = close
+            break
+        pos = html.find(marker, line_end)
+    if target_grid_end is None:
+        _warn("  主页里找不到分区「%s」，跳过" % section)
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+
+    new_html = html[:target_grid_end + 1] + card + html[target_grid_end + 1:]
+
+    if dry_run:
+        _info("  [dry-run] 将在「%s」分区插入卡片：" % section)
+        for line in card.strip().split("\n"):
+            _info("    " + line)
+        shutil.rmtree(tmp, ignore_errors=True)
+        return True
+
+    with io.open(idx, "w", encoding="utf-8") as f:
+        f.write(new_html)
+    _run(["git", "config", "user.name", AUTHOR_NAME], cwd=tmp)
+    _run(["git", "config", "user.email", AUTHOR_EMAIL], cwd=tmp)
+    _run(["git", "add", "index.html"], cwd=tmp)
+    rc, out, err = _run(["git", "commit", "-m", "docs: 主页新增 %s 卡片" % slug], cwd=tmp)
+    if rc != 0:
+        _warn("  提交失败：%s" % (err or out))
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+    rc, out, err = _run(["git", "push", "origin", "main"], cwd=tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    if rc != 0:
+        _warn("  推送主页失败：%s" % (err or out))
+        return False
+    _info("  ✓ 已插入「%s」分区并推送主页" % section)
+    return True
+
+
+# ----------------------------------------------------------
+#  主流程
+# ----------------------------------------------------------
+def main(argv=None):
+    p = argparse.ArgumentParser(
+        description="skill 一键上架：建仓库 → 开 Pages → 生成网页 → 加主页卡片")
+    p.add_argument("--yes", action="store_true", help="真正执行（默认只预览）")
+    p.add_argument("--dry-run", action="store_true", help="只预览，不改任何东西")
+    p.add_argument("--no-homepage", action="store_true", help="跳过主页卡片这一步")
+    p.add_argument("--section", help="主页分区（模糊匹配：学习知识库 / 工具项目 / 其他工具）")
+    p.add_argument("--no-pages", action="store_true", help="跳过开 Pages")
+    p.add_argument("--no-about", action="store_true", help="跳过写 About")
+    a = p.parse_args(argv)
+
+    dry_run = not a.yes
+    if not dry_run and not _has_gh():
+        _err("gh 未登录或未安装。先跑 gh auth login")
+
+    mf = _read_manifest()
+    slug = _slug(mf)
+
+    print("=" * 56)
+    print("  skill 一键上架")
+    print("=" * 56)
+    print("  skill 目录 : %s" % SKILL_DIR)
+    print("  仓库名     : %s/%s" % (OWNER, slug))
+    print("  版本       : %s" % mf.get("version", "?"))
+    print("  模式       : %s" % ("预览（--yes 才真执行）" if dry_run else "执行"))
+    print()
+
+    created = step_create_repo(slug, mf, dry_run)
+    if not created and not _repo_exists(slug) and not dry_run:
+        _err("仓库既没建成功也不存在，中止")
+
+    step_gen_page(slug, mf, dry_run)
+    step_push(slug, dry_run)
+    if not a.no_pages:
+        step_pages(slug, dry_run)
+    if not a.no_about:
+        step_about(slug, mf, dry_run)
+    if not a.no_homepage:
+        step_homepage(slug, mf, a.section, dry_run)
+
+    print()
+    if dry_run:
+        print("预览完成。确认无误后加 --yes 真正执行。")
+    else:
+        print("✅ 上架完成")
+        print("   仓库   : https://github.com/%s/%s" % (OWNER, slug))
+        print("   网页   : https://%s.github.io/%s/" % (OWNER, slug))
+        print("   主页   : %s" % HOMEPAGE_URL)
+        print("   Pages 构建约需 45 秒，稍后再访问网页。")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

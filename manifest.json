@@ -1,8 +1,8 @@
 {
   "id": "self-release",
   "name": "Skill 自更新与发布",
-  "version": "1.3.2",
-  "description": "当用户说「更新这个 skill / 发布这个 skill / 升级脚本到 GitHub / 打个 tag 推上去」时使用。自动定位目标 skill 对应的 GitHub 仓库、当前版本、最近 tag 与本地分支状态，然后按标准流程完成：版本递增（同步 SKILL.md + manifest.json + CHANGELOG.md）→ 本地验证 → 本地与仓库 clone 一致性比对 → 提交推送（署名白澤 程）→ 打 tag → 汇报。核心能力：发布过的 skill 自带 .release.json 坐标，任何机器装上后说一句话就能更新，不需要用户提供仓库地址或版本号。",
+  "version": "1.4.0",
+  "description": "当用户说「更新这个 skill / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（三处元数据同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。",
   "author": "白澤 程",
   "license": "MIT",
   "main": "./SKILL.md",
@@ -19,14 +19,19 @@
     "release",
     "git",
     "automation",
-    "版本管理"
+    "版本管理",
+    "github-pages",
+    "publish"
   ],
   "keywords": [
     "skill 更新",
     "发布",
     "打 tag",
     "版本递增",
-    "GitHub 推送"
+    "GitHub 推送",
+    "一键上架",
+    "自动建仓库",
+    "自动开 Pages"
   ],
   "update_mode": "overwrite",
   "min_agent_version": "1.0.0",
@@ -37,6 +42,8 @@
     "CHANGELOG.md",
     "scripts/release.py",
     "install.sh",
-    "index.html"
+    "index.html",
+    "scripts/new_repo.py",
+    "templates/page.html"
   ]
 }

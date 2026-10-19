@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!-- generated-by: new_repo.py -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{NAME}} · {{AUTHOR}}</title>
+<meta name="description" content="{{DESC_SHORT}}">
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --bg3:#21262d;
+    --fg:#e6edf3; --fg2:#8b949e; --fg3:#6e7681;
+    --accent:#58a6ff; --accent2:#3fb950; --warn:#d29922; --danger:#f85149;
+    --border:#30363d; --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    line-height:1.7;font-size:16px;
+    padding:0 16px;overflow-x:hidden;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:32px 0 64px}
+  header{text-align:center;padding:24px 0 32px;border-bottom:1px solid var(--border);margin-bottom:32px}
+  h1{font-size:clamp(24px,6vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.25;margin:0}
+  h1 .sub{display:block;font-size:clamp(13px,3.2vw,16px);color:var(--fg2);font-weight:400;margin-top:10px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+  .badges img{height:20px;display:block}
+  h2{font-size:clamp(18px,4.4vw,22px);font-weight:650;margin:40px 0 14px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.35}
+  h3{font-size:clamp(15px,3.6vw,17px);font-weight:600;margin:24px 0 10px;color:var(--fg)}
+  p{margin:10px 0;color:var(--fg)}
+  .muted{color:var(--fg2);font-size:14px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  ul,ol{margin:10px 0 10px 20px;padding:0}
+  li{margin:6px 0}
+  code{
+    background:var(--bg3);padding:2px 6px;border-radius:5px;
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-size:.88em;color:#79c0ff;
+    white-space:pre-wrap;overflow-wrap:anywhere;
+  }
+  pre{
+    background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;margin:14px 0;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  pre code{background:none;padding:0;color:var(--fg);font-size:13px;line-height:1.6;white-space:pre}
+  .cmt{color:var(--fg3)}
+  .ok{color:var(--accent2)}
+  .hl{color:var(--accent)}
+  .card{
+    background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;margin:16px 0;
+  }
+  .card.hi{border-color:var(--accent);background:rgba(88,166,255,.06)}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0;font-size:14px}
+  .flow span{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;white-space:nowrap}
+  .flow .arrow{color:var(--fg3);border:none;background:none;padding:0 2px}
+  .table-wrap{
+    position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    margin:14px 0;border:1px solid var(--border);border-radius:var(--radius);
+  }
+  .table-wrap table{width:100%;border-collapse:collapse;font-size:14px;min-width:340px}
+  .table-wrap th,.table-wrap td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  .table-wrap th{background:var(--bg3);font-weight:600;white-space:nowrap}
+  .table-wrap tr:last-child td{border-bottom:none}
+  .swipe-hint{display:none;font-size:12px;color:var(--fg3);text-align:right;margin:-8px 0 8px}
+  .table-wrap.is-scrollable + .swipe-hint{display:block}
+  footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--border);text-align:center;color:var(--fg3);font-size:13px}
+  footer a{color:var(--fg2)}
+  @media (max-width:768px){
+    .wrap{padding:20px 0 48px}
+    h2{margin:32px 0 12px}
+    .table-wrap table{font-size:13px}
+    .table-wrap th,.table-wrap td{padding:8px 10px}
+  }
+  @media (max-width:380px){
+    body{padding:0 12px;font-size:15px}
+    .card{padding:14px 15px}
+    .table-wrap table{min-width:300px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>{{NAME}}<span class="sub">{{TAGLINE}}</span></h1>
+  <div class="badges">
+    <img src="https://img.shields.io/badge/version-{{VERSION}}-blue" alt="version">
+    <img src="https://img.shields.io/badge/license-{{LICENSE}}-green" alt="license">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey" alt="platform">
+  </div>
+</header>
+
+<h2>一句话安装</h2>
+<pre><code>{{INSTALL_CMD}}</code></pre>
+<p class="muted">装完即可用。重复执行是幂等的——已装则自动转为更新。</p>
+
+<h2>这是什么</h2>
+<div class="card hi">
+<p>{{DESC_LONG}}</p>
+</div>
+
+<h2>核心机制</h2>
+<div class="flow">
+{{FLOW_HTML}}
+</div>
+
+<h2>全部命令</h2>
+<div class="table-wrap">
+<table>
+<tr><th>命令</th><th>作用</th></tr>
+{{CMD_ROWS}}
+</table>
+</div>
+<div class="swipe-hint">← 左右滑动查看完整表格 →</div>
+
+<h2>配置字段</h2>
+<div class="table-wrap">
+<table>
+<tr><th>字段</th><th>含义</th></tr>
+{{CFG_ROWS}}
+</table>
+</div>
+<div class="swipe-hint">← 左右滑动查看完整表格 →</div>
+
+<h2>环境要求</h2>
+<ul>
+<li>Python 3.8+（只用标准库，无需 <code>pip install</code>）</li>
+<li><code>git</code>（更新用）</li>
+<li><code>gh</code>（可选，私有仓库需要）</li>
+</ul>
+
+<h2>相关项目</h2>
+<div class="card">
+<p>同作者的其他工具：</p>
+<ul>
+{{RELATED_HTML}}
+</ul>
+</div>
+
+<footer>
+<p>{{AUTHOR}} · <a href="https://github.com/{{OWNER}}/{{SLUG}}">GitHub 仓库</a> · <a href="https://{{OWNER}}.github.io/">返回主页</a></p>
+<p>© {{YEAR}} {{AUTHOR}} · {{LICENSE}} License</p>
+</footer>
+
+</div>
+<script>
+(function(){
+  function mark(){
+    document.querySelectorAll('.table-wrap').forEach(function(w){
+      var over = w.scrollWidth - w.clientWidth > 1;
+      w.classList.toggle('is-scrollable', over);
+    });
+  }
+  if (document.readyState !== 'loading') mark();
+  else document.addEventListener('DOMContentLoaded', mark);
+  window.addEventListener('resize', mark);
+  if (window.ResizeObserver) new ResizeObserver(mark).observe(document.body);
+})();
+</script>
+</body>
+</html>
