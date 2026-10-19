@@ -658,12 +658,15 @@ def run_verify():
     print("仓库: %s/%s   版本: v%s\n" % (owner, name, version))
 
     # 相对仓库根的文件路径
-    if cfg.get("subdir"):
-        rel_dir = cfg["subdir"].strip("/")
+    # 注意：subdir 为 "" 表示「skill 在仓库根目录」，是合法声明；
+    # 只有「配置里根本没有 subdir 键」才需要回退去推断。
+    if "subdir" in cfg:
+        rel_dir = (cfg.get("subdir") or "").strip("/") or "."
     else:
         rc, git_root, _ = _run(["git", "rev-parse", "--show-toplevel"])
         if rc != 0:
             print("⚠️  非 git 仓库且 .release.json 未声明 subdir，跳过 blob 比对")
+            print("    修复：在 .release.json 里加 \"subdir\": \"\"（仓库根）或具体子目录")
             return 0
         rel_dir = os.path.relpath(SKILL_DIR, git_root)
 

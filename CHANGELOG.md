@@ -3,6 +3,13 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.1] - 2026-10-19
+
+### 修复
+- **`--verify` 在 `subdir: ""` 时静默跳过比对**：原判定用 `if cfg.get("subdir")`，空字符串为假 → 走进 `git rev-parse` 分支 → 非 git 目录直接打印"跳过"并 `return 0`（假通过）。现在改为 `if "subdir" in cfg`，`""` 被正确解释为"skill 在仓库根目录"，`rel_dir = "."`。
+- 跳过分支补上修复提示，不再只给一句"跳过"。
+- 这条 bug 会让「发布前必查」的 blob 比对失效——修好后立刻抓出了本 skill 自己 `release.py` 未推送的真实差异。
+
 ## [1.3.0] - 2026-10-19
 
 ### 修复

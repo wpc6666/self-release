@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
