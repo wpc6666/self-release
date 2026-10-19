@@ -42,8 +42,22 @@ import argparse
 AUTHOR_NAME = "白澤 程"
 AUTHOR_EMAIL = "87405429+wpc6666@users.noreply.github.com"
 
-# 本文件位于 <skill_root>/scripts/release.py → skill 根目录为上一级
-SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# skill 根目录解析：
+#   ① 显式环境变量 RELEASE_SKILL_DIR（最高优先）
+#   ② 当前工作目录（若里面有 SKILL.md 或 manifest.json）——支持「cd 到目标 skill 再跑别的副本」
+#   ③ 脚本所在位置的上一级（本文件位于 <skill_root>/scripts/release.py）
+def _resolve_skill_dir():
+    env = os.environ.get("RELEASE_SKILL_DIR")
+    if env:
+        return os.path.abspath(os.path.expanduser(env))
+    cwd = os.getcwd()
+    for marker in ("SKILL.md", "manifest.json", ".release.json"):
+        if os.path.isfile(os.path.join(cwd, marker)):
+            return cwd
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+SKILL_DIR = _resolve_skill_dir()
 MANIFEST_JSON = os.path.join(SKILL_DIR, "manifest.json")
 SKILL_MD = os.path.join(SKILL_DIR, "SKILL.md")
 CHANGELOG_MD = os.path.join(SKILL_DIR, "CHANGELOG.md")
@@ -506,8 +520,20 @@ def run_update(target=None, keep_local=None):
         with io.open(os.path.join(dest, name), "w", encoding="utf-8") as f:
             f.write(content)
 
-    rc, out, _ = _run(["git", "rev-parse", "--short", "HEAD"], cwd=dest)
-    print("✅ 已更新到 %s" % (out.strip() or "(未知)"))
+    # 版本号：优先 manifest.json，其次 git rev-parse
+    ver = None
+    mp = os.path.join(dest, "manifest.json")
+    if os.path.isfile(mp):
+        try:
+            with io.open(mp, encoding="utf-8") as f:
+                ver = (json.load(f) or {}).get("version")
+        except Exception:
+            pass
+    if not ver:
+        rc, out, _ = _run(["git", "rev-parse", "--short", "HEAD"], cwd=dest)
+        ver = out.strip() or "(未知)"
+
+    print("✅ 已更新到 v%s" % ver if ver and ver[0].isdigit() else "✅ 已更新到 %s" % ver)
     print("   保留的本地文件：%s" % (", ".join(sorted(keep)) if keep else "无"))
     return 0
 
