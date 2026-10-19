@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -17,6 +17,30 @@
 # 现在：
 python3 scripts/release.py --update
 ```
+
+### 「一句话更新」靠什么成立
+
+用户说「更新 X」，agent 不问任何东西，靠三级兜底：
+
+| 级别 | 前提 | agent 动作 |
+|---|---|---|
+| 1 | `X/.release.json` 存在 | `cd X && python3 scripts/release.py --update` |
+| 2 | 只有 `manifest.json` 的 `repository` | 同上（自动回退读 manifest） |
+| 3 | 什么坐标都没有 | **问用户一次**仓库地址 → `--init` 钉死 → 之后永久免问 |
+
+所以「不需要原始链接」的准确含义是：**链接只需提供一次，之后写进 skill 自己的配置，永远不用再提供。**
+
+新电脑上连本 skill 都没有时，用上面的 `install.sh` 破局——那是唯一一次需要记住 URL 的地方。
+
+## 一条命令安装
+
+新电脑上还没有这个 skill 时：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
+```
+
+装到 `~/.dsh/skills/self-release/`，自动写入 `.release.json`。**幂等**——已装过会转为更新流程。
 
 ## 快速开始
 

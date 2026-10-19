@@ -1,6 +1,6 @@
 ---
 name: self-release
-version: 1.1.0
+version: 1.2.0
 description: 当用户说「更新这个 skill / 发布这个 skill / 升级脚本到 GitHub / 打个 tag 推上去 / 安装这个 skill」时使用。自动定位目标 skill 对应的 GitHub 仓库、当前版本、最近 tag 与本地分支状态，然后按标准流程完成：版本递增（patch/minor/major，同步 SKILL.md + manifest.json + CHANGELOG.md 三处）→ 本地验证 → 本地与仓库 clone 一致性比对 → 提交推送（署名白澤 程）→ 打 tag → 汇报。也支持按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
@@ -41,7 +41,27 @@ skill 目录/
 
 ---
 
-## 三种使用场景
+## 四种使用场景
+
+### 场景 0：新电脑，连这个 skill 都还没有（鸡生蛋）
+
+**问题**：没有 `release.py`，就没有任何东西能读坐标。
+
+**解法**：一条 curl 引导命令。这一步是唯一需要"链接"的地方，之后永久免链接。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
+```
+
+装到 `~/.dsh/skills/self-release/`（可用 `DSH_HOME` 改根目录），并自动写入 `.release.json`。
+
+**agent 处理「我新电脑上啥都没有，装一下 X」时的正确做法**：
+
+1. 先跑上面的 curl 装 self-release（一条命令，幂等，已装则自动转更新）
+2. 再 `python3 ~/.dsh/skills/self-release/scripts/release.py --init <X的仓库地址>`
+3. 最后 `--install --target ~/.dsh/skills/X`
+
+第 2 步的仓库地址只需提供一次。
 
 ### 场景 A：用户说「更新这个 skill」（在本机改代码后发布）
 
@@ -225,6 +245,33 @@ gh api repos/<user>/<repo>/contents/<path> --jq '.sha'   # 远端 blob，必须�
 3. **跑了哪些验证**（具体命令 + 真实结果）
 4. **哪些没验**（没跑就写「未运行」）
 5. **剩余风险 / 待办**
+
+---
+
+## 「一句话更新」到底怎么成立的
+
+用户说「更新 X」，agent 不需要问任何东西，靠的是**三级兜底**：
+
+| 级别 | 前提 | agent 动作 |
+|---|---|---|
+| 1 | `~/.dsh/skills/X/.release.json` 存在 | `cd X && python3 scripts/release.py --update` |
+| 2 | 只有 `manifest.json` 的 `repository` | 同上（`_remote_coords()` 自动回退读 manifest） |
+| 3 | 什么坐标都没有 | **问用户一次**仓库地址 → `--init` 钉死 → 之后永久免问 |
+
+所以「不需要原始链接」的准确含义是：**链接只需提供一次，之后写进 skill 自己的配置，永远不用再提供。**
+
+而新电脑上连 self-release 都没有时，用 `install.sh` 这条 curl 引导命令破局——那是唯一一次需要记住 URL 的地方。
+
+### 让别的 skill 也能一句话更新
+
+每个要接入的 skill 跑一次：
+
+```bash
+cd ~/.dsh/skills/X
+python3 ~/.dsh/skills/self-release/scripts/release.py --init https://github.com/<user>/<repo>.git --subdir "<路径>"
+```
+
+`--init` 写 `.release.json`，之后 `--update` / `--list` 全部自动。
 
 ---
 
