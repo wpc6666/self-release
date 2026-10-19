@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -57,30 +57,36 @@ python3 scripts/release.py --verify                 # 本地 vs 远端 blob 一�
 
 然后按 `SKILL.md` 的七步流程走：验证 → 同步 clone → 提交推送 → 打 tag → 汇报。
 
-### 更新：别的机器上拉最新版
+### 更新：只说名字，不用 cd
 
 ```bash
-cd ~/.dsh/skills/X
-python3 scripts/release.py --update
+python3 ~/.dsh/skills/self-release/scripts/release.py --update X
 ```
 
-自动区分两条路径：
+脚本按名字定位到 `$DSH_HOME/skills/X`，然后自动区分两条路径：
 
 - 目录是 git 仓库 → `git fetch` + `git reset --hard origin/<branch>`
 - 目录不是 git 仓库（当初是拷贝的）→ 下载 tarball 覆盖
 
 两种情况都**保留本地 `.release.json`**，不会覆盖你钉死的坐标。
 
+**整个仓库一起更新**（一个仓库里放了多个 skill）：
+
+```bash
+python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
+```
+
+解析出 X 所属仓库 → 扫描所有已装 skill → 坐标相同的全部更新一遍。
+
 ### 新装：新机器上从零装
 
 ```bash
-git clone https://github.com/wpc6666/self-release.git /tmp/sr
-cd /tmp/sr
-python3 scripts/release.py --init https://github.com/<user>/<repo>.git --subdir "<路径>"
-python3 scripts/release.py --install --target ~/.dsh/skills/X
+python3 ~/.dsh/skills/self-release/scripts/release.py \
+        --install X --from-repo https://github.com/<user>/<repo>.git
 ```
 
-坐标只需提供一次，之后永久免链接。
+`--from-repo` 装完后**自动把坐标写进目标目录的 `.release.json`**，
+之后 `--update X` 一句话即可。坐标只需提供一次，之后永久免链接。
 
 ### 查看所有 skill 的坐标
 
@@ -92,7 +98,7 @@ python3 scripts/release.py --list
 == 已装 skill 与发布坐标 ==
 skill                 版本   仓库                                               分支/子目录
 cfec-thesis-formatter 2.2.0  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
-self-release          1.1.0  https://github.com/wpc6666/self-release.git         main
+self-release          1.5.0  https://github.com/wpc6666/self-release.git         main
 ```
 
 ## 一键上架（新 skill）
@@ -127,8 +133,11 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 | `--bump <...> --dry-run` | 只预览，不写文件 |
 | `--verify` | 比对本地文件 blob 与远端 GitHub blob |
 | `--init <repo_url>` | 钉死仓库坐标，写入 `.release.json` |
-| `--install` | 按坐标安装（新机器首次） |
-| `--update` | 按坐标拉最新版（保留 `.release.json`） |
+| `--install` | 按当前目录坐标安装 |
+| `--install NAME --from-repo URL` | 从指定仓库安装，**并自动记录坐标** |
+| `--update` | 更新当前目录的 skill |
+| `--update NAME` | **只说名字**更新，不用 cd |
+| `--update-repo NAME` | 更新该仓库下的**全部** skill |
 | `--list` | 列出所有已装 skill 的版本与发布坐标 |
 
 ## 自动定位规则

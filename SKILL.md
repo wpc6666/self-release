@@ -1,6 +1,6 @@
 ---
 name: self-release
-version: 1.4.0
+version: 1.5.0
 description: 当用户说「更新这个 skill / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（三处元数据同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
@@ -39,6 +39,10 @@ skill 目录/
 
 `subdir` 是 skill 在仓库里的相对路径；skill 在仓库根目录就留空。
 
+**这份文件是自动生成的**：`--install` 和 `--update` 成功后都会写一次
+（`_write_release_json()`）。所以用户装完就忘了链接也没关系，坐标已经在
+skill 自己身上了。
+
 ---
 
 ## 四种使用场景
@@ -73,28 +77,51 @@ python3 scripts/release.py --bump minor
 # …按下方「第二步」到「第七步」执行…
 ```
 
-### 场景 B：用户说「更新 X」（别的机器上，本地已有该 skill）
-
-**一句话搞定，不需要链接：**
+### 场景 B：用户说「更新 X」——只说名字就够，不用 cd
 
 ```bash
-cd ~/.dsh/skills/X
-python3 scripts/release.py --update
+python3 ~/.dsh/skills/self-release/scripts/release.py --update X
 ```
 
-脚本读 `.release.json` → `git fetch` + `git reset --hard origin/<branch>` → 保留本地 `.release.json`。
+脚本按名字定位到 `$DSH_HOME/skills/X`，读它的 `.release.json` → `git fetch` +
+`git reset --hard origin/<branch>` → 保留本地 `.release.json`。
 
 如果那个目录不是 git 仓库（比如当初是拷贝过去的），脚本自动改用 tarball 覆盖下载，效果一样。
+
+**整个仓库一起更新**（一个仓库里放了多个 skill 时）：
+
+```bash
+python3 ~/.dsh/skills/self-release/scripts/release.py --update-repo X
+```
+
+解析出 X 所属仓库 → 扫描所有已装 skill → 坐标相同的全部更新一遍。
 
 ### 场景 C：新机器，本地还没有这个 skill
 
 ```bash
-# 先拿到 release.py（从本仓库或任一已有副本）
-git clone https://github.com/wpc6666/self-release.git /tmp/sr
-cd /tmp/sr && python3 scripts/release.py --install --target ~/.dsh/skills/X
+python3 ~/.dsh/skills/self-release/scripts/release.py \
+        --install X --from-repo https://github.com/<user>/<repo>.git
 ```
 
-但注意：`--install` 读的是**当前目录**的 `.release.json`。所以更常见的是——用户说「装一下 X」，agent 先确认 X 的仓库地址（一次），`--init` 钉死坐标后再 `--install`。**坐标只需提供一次，之后永久免链接。**
+`--from-repo` 装完后**自动把坐标写进目标目录的 `.release.json`**，
+之后 `--update X` 一句话即可，不需要再提供链接。
+
+如果连 self-release 本身都还没有，先用场景 0 的 curl 引导命令。
+
+### 命令速查
+
+| 命令 | 作用 |
+|---|---|
+| `--check` | 定位仓库 / 版本 / tag / 分支状态 |
+| `--bump major\|minor\|patch` | 递增版本，同步三处元数据 |
+| `--verify` | 本地与远端 blob 一致性 |
+| `--init URL [--branch B] [--subdir S]` | 钉死坐标，写入 `.release.json` |
+| `--install` | 按当前目录的坐标安装 |
+| `--install NAME --from-repo URL` | 从指定仓库安装，**并自动记录坐标** |
+| `--update` | 更新当前目录的 skill |
+| `--update NAME` | **只说名字**更新，不用 cd |
+| `--update-repo NAME` | 更新该仓库下的**全部** skill |
+| `--list` | 列出所有 skill 的发布坐标 |
 
 ### 查看所有 skill 的发布坐标
 
@@ -111,7 +138,8 @@ cfec-thesis-formatter 2.2.0  https://github.com/wpc6666/cfec-thesis-formatter.gi
 self-release          1.1.0  https://github.com/wpc6666/self-release.git         main
 ```
 
-**agent 处理「更新 X」时的正确做法**：先跑 `--list` 查 X 有没有坐标。有 → 直接 `--update`；没有 → 问用户一次仓库地址，`--init` 钉死，以后就不用再问。
+**agent 处理「更新 X」时的正确做法**：先跑 `--list` 查 X 有没有坐标。有 → 直接
+`--update X`；没有 → 问用户一次仓库地址，`--init` 或 `--install --from-repo` 钉死，以后就不用再问。
 
 ---
 
@@ -289,7 +317,7 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 
 | 级别 | 前提 | agent 动作 |
 |---|---|---|
-| 1 | `~/.dsh/skills/X/.release.json` 存在 | `cd X && python3 scripts/release.py --update` |
+| 1 | `~/.dsh/skills/X/.release.json` 存在 | `release.py --update X`（不用 cd） |
 | 2 | 只有 `manifest.json` 的 `repository` | 同上（`_remote_coords()` 自动回退读 manifest） |
 | 3 | 什么坐标都没有 | **问用户一次**仓库地址 → `--init` 钉死 → 之后永久免问 |
 

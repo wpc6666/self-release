@@ -25,8 +25,11 @@ Skill 自更新与发布辅助脚本（release.py）—— 通用版
     python3 scripts/release.py --bump patch             # 递增版本并同步三处文件
     python3 scripts/release.py --bump minor --dry-run   # 只预览，不写文件
     python3 scripts/release.py --verify                 # 一致性检查（本地 vs 远端 blob）
-    python3 scripts/release.py --install                # 按配置坐标安装（新机器）
-    python3 scripts/release.py --update                 # 按配置坐标拉最新
+    python3 scripts/release.py --install                # 按配置坐标安装（新机器，自动记录仓库）
+    python3 scripts/release.py --install NAME --from-repo URL   # 从指定仓库安装并记住坐标
+    python3 scripts/release.py --update                 # 更新当前目录的 skill
+    python3 scripts/release.py --update NAME            # 只说名字即可更新，不用 cd
+    python3 scripts/release.py --update-repo NAME       # 更新该仓库下的全部 skill
     python3 scripts/release.py --list                   # 列出所有 skill 的发布坐标
 """
 
@@ -451,12 +454,76 @@ def _normalize_repo(repo):
     return r
 
 
-def run_install(target=None):
-    """从 skill 配置里的坐标安装（或修复）本 skill。"""
-    repo, branch, subdir, skill_id = _remote_coords()
+def _use_skill_dir(d):
+    """把全局 skill 路径切到指定目录，让按名字操作也能复用同一套解析逻辑。"""
+    global SKILL_DIR, MANIFEST_JSON, SKILL_MD, CHANGELOG_MD
+    SKILL_DIR = d
+    MANIFEST_JSON = os.path.join(d, "manifest.json")
+    SKILL_MD = os.path.join(d, "SKILL.md")
+    CHANGELOG_MD = os.path.join(d, "CHANGELOG.md")
+    return d
+
+
+def _skill_dir_by_name(name):
+    """把 skill 名字解析成目录，支持只给名字、不用 cd 进去。"""
+    if not name:
+        return SKILL_DIR
+    cand = name
+    if not os.path.isabs(cand) and os.sep not in cand:
+        cand = os.path.join(SKILLS_ROOT, name)
+    cand = os.path.abspath(os.path.expanduser(cand))
+    if not os.path.isdir(cand):
+        _err("找不到 skill：%s\n用 --list 看已装的 skill 名字" % cand)
+    return cand
+
+
+def _write_release_json(dest, repo, branch, subdir):
+    """把仓库坐标钉死到 skill 目录的 .release.json。
+
+    这是「装完就记住、以后只说名字」的关键：安装和更新都会调用它。
+    已有的自定义键会保留，不会被覆盖。
+    """
+    cfgp = os.path.join(dest, ".release.json")
+    data = {
+        "repo": _normalize_repo(repo),
+        "branch": branch or "main",
+        "subdir": subdir or "",
+    }
+    old = {}
+    if os.path.isfile(cfgp):
+        try:
+            with io.open(cfgp, encoding="utf-8") as f:
+                old = json.load(f) or {}
+        except Exception:
+            old = {}
+    for k, v in old.items():
+        data.setdefault(k, v)
+    with io.open(cfgp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+    return cfgp
+
+
+def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None):
+    """从 skill 配置里的坐标安装（或修复）本 skill。
+
+    安装成功后会把仓库坐标写进目标目录的 .release.json，
+    以后用户只说「更新 <名字>」就能更新，不需要再提供链接。
+    """
+    if from_repo:
+        repo = from_repo
+        branch = branch or "main"
+        subdir = subdir or ""
+        skill_id = os.path.basename((name or "").rstrip("/") or
+                                    re.sub(r"\.git$", "",
+                                           repo.rstrip("/").split("/")[-1]))
+    else:
+        repo, branch, subdir, skill_id = _remote_coords()
+        if name:
+            skill_id = os.path.basename(name.rstrip("/"))
     if not repo:
         _err("skill 配置里没有仓库坐标（.release.json 的 repo 或 manifest.json 的 repository），"
-             "无法自动安装。请先跑 --init <repo_url> 钉死坐标。")
+             "无法自动安装。请先跑 --init <repo_url> 钉死坐标，"
+             "或用 --install NAME --from-repo URL 直接指定来源。")
 
     dest = os.path.expanduser(target) if target else os.path.join(SKILLS_ROOT, skill_id)
     url = _normalize_repo(repo)
@@ -496,20 +563,29 @@ def run_install(target=None):
                 continue
             os.rename(src_p, dst_p)
 
+    cfgp = _write_release_json(dest, repo, branch, subdir)
     print("✅ 已安装到 %s" % dest)
+    print("   已记录仓库坐标：%s" % cfgp)
+    print("   以后说「更新 %s」即可，不用再提供链接。" % skill_id)
     return 0
 
 
-def run_update(target=None, keep_local=None):
+def run_update(target=None, keep_local=None, name=None):
     """按 skill 配置里的坐标拉取最新版本。
 
-    keep_local 里的文件名会被保留（默认保留 .release.json）。
+    name 给出时按名字定位 skill（不用 cd 进去）；keep_local 里的文件名
+    会被保留（默认保留 .release.json）。
     """
+    if target:
+        dest = os.path.expanduser(target)
+    elif name:
+        dest = _use_skill_dir(_skill_dir_by_name(name))
+    else:
+        dest = SKILL_DIR
+
     repo, branch, subdir, skill_id = _remote_coords()
     if not repo:
-        _err("skill 配置里没有仓库坐标，无法自动更新。")
-
-    dest = os.path.expanduser(target) if target else SKILL_DIR
+        _err("skill 配置里没有仓库坐标，无法自动更新。请先跑 --init <repo_url> 钉死坐标。")
     url = _normalize_repo(repo)
     keep = set(keep_local or [".release.json"])
 
@@ -524,11 +600,11 @@ def run_update(target=None, keep_local=None):
 
     # 备份要保留的本地文件
     saved = {}
-    for name in keep:
-        fp = os.path.join(dest, name)
+    for _fn in keep:
+        fp = os.path.join(dest, _fn)
         if os.path.isfile(fp):
             with io.open(fp, encoding="utf-8") as f:
-                saved[name] = f.read()
+                saved[_fn] = f.read()
 
     if os.path.isdir(os.path.join(dest, ".git")):
         rc, out, err = _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=dest)
@@ -568,9 +644,12 @@ def run_update(target=None, keep_local=None):
         shutil.rmtree(tmpd, ignore_errors=True)
 
     # 还原保留文件
-    for name, content in saved.items():
-        with io.open(os.path.join(dest, name), "w", encoding="utf-8") as f:
+    for _fn, content in saved.items():
+        with io.open(os.path.join(dest, _fn), "w", encoding="utf-8") as f:
             f.write(content)
+
+    # 坐标持久化：更新完也确保 .release.json 在，下次仍能一句话更新
+    _write_release_json(dest, repo, branch, subdir)
 
     # 版本号：优先 manifest.json，其次 git rev-parse
     ver = None
@@ -587,6 +666,64 @@ def run_update(target=None, keep_local=None):
 
     print("✅ 已更新到 v%s" % ver if ver and ver[0].isdigit() else "✅ 已更新到 %s" % ver)
     print("   保留的本地文件：%s" % (", ".join(sorted(keep)) if keep else "无"))
+    return 0
+
+
+def run_update_repo(name=None, target=None):
+    """更新「整个仓库」：把同一仓库下的所有已装 skill 全部更新。
+
+    用户说「更新这个仓库的 skill」时用。先按 name 解析出仓库坐标，
+    再扫描 SKILLS_ROOT 找出坐标相同的所有 skill，逐个更新。
+    """
+    if target:
+        _use_skill_dir(os.path.expanduser(target))
+    elif name:
+        _use_skill_dir(_skill_dir_by_name(name))
+    repo, branch, subdir, skill_id = _remote_coords()
+    if not repo:
+        _err("没有仓库坐标，无法按仓库更新。请先跑 --init <repo_url>。")
+    want = _normalize_repo(repo)
+
+    peers = []
+    if os.path.isdir(SKILLS_ROOT):
+        for n in sorted(os.listdir(SKILLS_ROOT)):
+            d = os.path.join(SKILLS_ROOT, n)
+            if not os.path.isdir(d) or n.startswith("."):
+                continue
+            cfgp = os.path.join(d, ".release.json")
+            if not os.path.isfile(cfgp):
+                continue
+            try:
+                with io.open(cfgp, encoding="utf-8") as f:
+                    c = json.load(f) or {}
+            except Exception:
+                continue
+            if _normalize_repo(c.get("repo")) == want:
+                peers.append(n)
+
+    print("== 按仓库更新 ==")
+    print("仓库 : %s" % want)
+    print("分支 : %s" % branch)
+    print("同仓库的 skill：%s" % (", ".join(peers) if peers else "(无)"))
+    print()
+
+    if not peers:
+        print("没有其它 skill 记录了这个仓库，改为只更新当前 skill。")
+        return run_update(target=target)
+
+    failed = []
+    for n in peers:
+        print("--- 更新 %s ---" % n)
+        try:
+            run_update(name=n)
+        except SystemExit as e:
+            if e.code:
+                failed.append(n)
+    print()
+    if failed:
+        print("⚠️  以下 skill 更新失败：%s" % ", ".join(failed))
+        return 1
+    print("✅ 已更新 %d 个 skill（整个仓库）" % len(peers))
     return 0
 
 
@@ -739,10 +876,15 @@ def main(argv=None):
                    help="钉死仓库坐标，写入 .release.json（之后 --check 不再需要猜）")
     p.add_argument("--branch", help="配合 --init：显式指定分支名（fork 仓库常为 master）")
     p.add_argument("--subdir", help="配合 --init：skill 在仓库中的子目录（根目录留空）")
-    p.add_argument("--install", action="store_true",
-                   help="按 skill 配置里的坐标安装本 skill（新机器/首次）")
-    p.add_argument("--update", action="store_true",
-                   help="按 skill 配置里的坐标拉取最新版（保留 .release.json）")
+    p.add_argument("--install", nargs="?", const=True, metavar="SKILL",
+                   help="按坐标安装；可只给名字：--install NAME")
+    p.add_argument("--update", nargs="?", const=True, metavar="SKILL",
+                   help="按坐标更新；可只给名字：--update NAME")
+    p.add_argument("--update-repo", nargs="?", const=True, metavar="SKILL",
+                   dest="update_repo",
+                   help="更新同一仓库下的全部 skill（整个仓库）")
+    p.add_argument("--from-repo", metavar="URL", dest="from_repo",
+                   help="配合 --install：直接从该仓库安装，并把坐标写进目标目录")
     p.add_argument("--list", action="store_true",
                    help="列出所有已装 skill 及其配置的仓库坐标")
     p.add_argument("--target", help="配合 --install/--update：指定目标目录")
@@ -759,9 +901,16 @@ def main(argv=None):
     if a.verify:
         return run_verify()
     if a.install:
-        return run_install(target=a.target)
+        return run_install(target=a.target,
+                           name=None if a.install is True else a.install,
+                           from_repo=a.from_repo, branch=a.branch,
+                           subdir=a.subdir)
     if a.update:
-        return run_update(target=a.target)
+        return run_update(target=a.target,
+                          name=None if a.update is True else a.update)
+    if a.update_repo:
+        return run_update_repo(target=a.target,
+                               name=None if a.update_repo is True else a.update_repo)
     if a.list:
         return run_list()
     p.print_help()

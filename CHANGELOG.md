@@ -3,6 +3,54 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.5.0] - 2026-10-19
+
+### 新增：安装即记住仓库 + 只说名字就能更新
+
+**1. 安装时自动记录仓库坐标**
+
+`--install` 成功后会把仓库写进目标目录的 `.release.json`（新增 `_write_release_json()`）。
+以前装完不留坐标，下次要更新还得再问一次仓库地址；现在装完即记住。
+
+新增 `--from-repo URL`：本地没有任何坐标时，直接从指定仓库安装并写入坐标。
+
+```bash
+python3 scripts/release.py --install my-skill --from-repo https://github.com/me/repo.git
+# ✅ 已记录仓库坐标：~/.dsh/skills/my-skill/.release.json
+#    以后说「更新 my-skill」即可，不用再提供链接。
+```
+
+**2. 只说名字就能更新，不用先 cd**
+
+`--update` / `--install` 改成可选参数，`--update NAME` 直接按名字定位到 `$DSH_HOME/skills/NAME`：
+
+```bash
+python3 scripts/release.py --update cfec-thesis-formatter   # 任意目录下都能跑
+```
+
+新增 `_use_skill_dir()` 与 `_skill_dir_by_name()`，切换目录后复用同一套解析逻辑，
+不再需要「先 cd 进 skill 目录」这一步。
+
+**3. 按仓库整体更新**
+
+新增 `--update-repo NAME`：解析出该 skill 所属仓库，扫描所有已装 skill，
+把坐标相同的全部更新一遍。适用于「一个仓库里放了多个 skill」的情况。
+
+```bash
+python3 scripts/release.py --update-repo self-release
+# 同仓库的 skill：another, self-release
+# ✅ 已更新 2 个 skill（整个仓库）
+```
+
+`run_update()` 更新完成后也会重新写一次 `.release.json`，保证坐标不会因覆盖而丢失。
+
+### 修复
+
+- `run_update()` 内部循环变量 `name` 与新增的参数 `name` 同名冲突，已改为 `_fn`
+- 找不到 skill 时给出明确提示并返回退出码 1（原先是静默）
+
+---
+
 ## [1.4.0] - 2026-10-19
 
 ### 新增：一键上架（`scripts/new_repo.py`）
