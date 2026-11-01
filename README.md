@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.8.2-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -59,7 +59,7 @@ skill up --yes        # 上架新 skill（建仓库+开Pages+主页加卡片）
 
 ```bash
 skill check          # 定位：仓库 / 版本 / tag / 分支状态
-skill bump patch     # 递增版本（同步 SKILL.md / manifest.json / CHANGELOG.md 三处）
+skill bump patch     # 递增版本（同步 SKILL/manifest/CHANGELOG，README/index 存在时同步徽章）
 skill verify         # 本地 vs 远端 blob 一致性
 ```
 
@@ -104,8 +104,8 @@ python3 scripts/release.py --list
 ```
 == 已装 skill 与发布坐标 ==
 skill                 版本   仓库                                               分支/子目录
-cfec-thesis-formatter 2.2.0  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
-self-release          1.5.0  https://github.com/wpc6666/self-release.git         main
+cfec-thesis-formatter 2.2.6  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
+self-release          1.8.2  https://github.com/wpc6666/self-release.git         main
 ```
 
 ## 一键上架（新 skill）
@@ -136,7 +136,7 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 | 命令 | 作用 |
 |---|---|
 | `--check` | 定位：仓库地址、当前版本、最近 tag、分支同步状态 |
-| `--bump <patch\|minor\|major>` | 递增版本，同步 `SKILL.md` + `manifest.json` + `CHANGELOG.md` |
+| `--bump <patch\|minor\|major>` | 递增版本，同步 `SKILL.md` + `manifest.json` + `CHANGELOG.md`，并同步存在的 README/index 版本徽章 |
 | `--bump <...> --dry-run` | 只预览，不写文件 |
 | `--verify` | 比对本地文件 blob 与远端 GitHub blob |
 | `--init <repo_url>` | 钉死仓库坐标，写入 `.release.json` |

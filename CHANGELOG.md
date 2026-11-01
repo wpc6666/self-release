@@ -3,6 +3,17 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.2] - 2026-11-01
+
+### 修复
+
+- `--bump` 现在同步五处版本元数据：`SKILL.md`、`manifest.json`、
+  `CHANGELOG.md`，以及存在时的 `README.md` / `index.html` 版本徽章。
+- 修正 `_patch_manifest()` 在读取旧版本之前就覆盖 `version` 的问题。
+- 修复 README 徽章停留在 `1.5.0`、index.html 徽章停留在 `1.8.0` 的漂移。
+
+---
+
 ## [1.8.1] - 2026-10-19
 
 ### 修复

@@ -7,7 +7,8 @@ Skill 自更新与发布辅助脚本（release.py）—— 通用版
 用途：当用户说「更新 / 发布这个 skill」时，自动定位 GitHub 仓库与当前版本，
 辅助完成一次标准发布：
 
-    改代码 → 版本递增（SKILL.md / manifest.json / CHANGELOG 三处同步）
+    改代码 → 版本递增（SKILL.md / manifest.json / CHANGELOG / README / index.html，
+                        后两者存在时同步）
          → 本地验证 → 同步本地 skill 与仓库 clone → 提交推送 → 打 tag
 
 本脚本不绑定任何特定项目，全部按约定自动解析：
@@ -22,7 +23,7 @@ Skill 自更新与发布辅助脚本（release.py）—— 通用版
 
 用法：
     python3 scripts/release.py --check                  # 定位：仓库、版本、tag、分支状态
-    python3 scripts/release.py --bump patch             # 递增版本并同步三处文件
+    python3 scripts/release.py --bump patch             # 递增版本并同步版本元数据
     python3 scripts/release.py --bump minor --dry-run   # 只预览，不写文件
     python3 scripts/release.py --verify                 # 一致性检查（本地 vs 远端 blob）
     python3 scripts/release.py --install                # 按配置坐标安装（新机器，自动记录仓库）
@@ -203,7 +204,7 @@ def _bump_version(current, part):
 
 
 # ----------------------------------------------------------
-#  三处文件同步
+#  版本元数据同步（存在 README/index 时最多五处）
 # ----------------------------------------------------------
 def _patch_skill_md(new_version):
     if not os.path.isfile(SKILL_MD):
@@ -225,9 +226,47 @@ def _patch_manifest(new_version):
         return None, None
     with open(MANIFEST_JSON, encoding="utf-8") as f:
         data = json.load(f)
+    old = data.get("version", "?")
     data["version"] = new_version
-    return ("(旧 version=%s)" % data.get("version", "?")), \
+    return ("(旧 version=%s)" % old), \
            json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+
+
+def _repo_file(name):
+    """查找仓库根文件：兼容 skill 在仓库根或子目录两种布局。"""
+    for cand in (os.path.join(SKILL_DIR, name),
+                 os.path.join(os.path.dirname(SKILL_DIR), name)):
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
+def _patch_readme_badge(new_version):
+    path = _repo_file("README.md")
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as f:
+        before = f.read()
+    after, n = re.subn(
+        r"(badge/[Vv]ersion-)\d+\.\d+\.\d+(-)",
+        r"\g<1>" + new_version + r"\g<2>",
+        before,
+    )
+    return (path, before, after) if n else None
+
+
+def _patch_index_html(new_version):
+    path = _repo_file("index.html")
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as f:
+        before = f.read()
+    after, n = re.subn(
+        r"(badge/version-)\d+\.\d+\.\d+(-)",
+        r"\g<1>" + new_version + r"\g<2>",
+        before,
+    )
+    return (path, before, after) if n else None
 
 
 def _patch_changelog(new_version):
@@ -266,6 +305,16 @@ def apply_bump(part, dry_run=False):
         if before is None:
             print("  %-14s 不存在，跳过" % name)
             continue
+        targets.append((name, path, before, after))
+
+    for name, fn in (
+        ("README.md", _patch_readme_badge),
+        ("index.html", _patch_index_html),
+    ):
+        got = fn(new)
+        if not got:
+            continue
+        path, before, after = got
         targets.append((name, path, before, after))
 
     for name, path, before, after in targets:
@@ -1075,7 +1124,8 @@ def main(argv=None):
     p.add_argument("--check", nargs="?", const=True, metavar="SKILL",
                    help="定位并显示仓库/版本/分支；可只给名字：--check NAME")
     p.add_argument("--bump", choices=["major", "minor", "patch"],
-                   help="递增版本并同步 SKILL.md / manifest.json / CHANGELOG.md")
+                   help="递增版本并同步 SKILL.md / manifest.json / CHANGELOG.md，"
+                        "README/index 存在时同步版本徽章")
     p.add_argument("--dry-run", action="store_true",
                    help="与 --bump 联用：只预览，不写文件")
     p.add_argument("--verify", nargs="?", const=True, metavar="SKILL",
