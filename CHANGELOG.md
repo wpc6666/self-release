@@ -3,6 +3,16 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.4] - 2026-11-02
+
+### 重构
+
+- 将安装、命令速查、`--list` 输出、`.release.json` 和接入命令抽取到
+  `references/COMMANDS.md`。
+- README 与 SKILL 去掉重复命令正文，保留职责说明和分层指针。
+
+---
+
 ## [1.8.3] - 2026-11-02
 
 ### 修复

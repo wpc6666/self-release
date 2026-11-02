@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.8.3-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.8.4-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -34,24 +34,14 @@ python3 scripts/release.py --update
 
 ## 一条命令安装
 
-新电脑上还没有这个 skill 时：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
-```
-
-装到 `~/.dsh/skills/self-release/`，自动写入 `.release.json`。**幂等**——已装过会转为更新流程。
+新电脑上的 curl 引导、全部 CLI 与 `.release.json` 格式统一见
+[references/COMMANDS.md](references/COMMANDS.md)。
 
 ## 一句话
 
 对 agent 说「更新这个 skill」，它跑 `skill update X`。**你不需要记仓库地址、版本号、也不需要看长路径命令。**
 
-```bash
-skill update X        # 更新某个 skill
-skill update --all    # 全部更新
-skill list            # 看有哪些、版本多少
-skill up --yes        # 上架新 skill（建仓库+开Pages+主页加卡片）
-```
+命令速查见 [references/COMMANDS.md](references/COMMANDS.md#日常命令)。
 
 ## 快速开始
 
@@ -97,16 +87,8 @@ skill install X --from-repo https://github.com/<user>/<repo>.git
 
 ### 查看所有 skill 的坐标
 
-```bash
-python3 scripts/release.py --list
-```
-
-```
-== 已装 skill 与发布坐标 ==
-skill                 版本   仓库                                               分支/子目录
-cfec-thesis-formatter 2.2.8  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
-self-release          1.8.3  https://github.com/wpc6666/self-release.git         main
-```
+运行 `python3 scripts/release.py --list`；输出字段与示例见
+[references/COMMANDS.md](references/COMMANDS.md#查看发布坐标)。
 
 ## 一键上架（新 skill）
 
@@ -133,19 +115,7 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 
 ## 全部命令
 
-| 命令 | 作用 |
-|---|---|
-| `--check` | 定位：仓库地址、当前版本、最近 tag、分支同步状态 |
-| `--bump <patch\|minor\|major>` | 递增版本，同步 `SKILL.md` + `manifest.json` + `CHANGELOG.md`，并同步存在的 README/index 版本徽章 |
-| `--bump <...> --dry-run` | 只预览，不写文件 |
-| `--verify` | 比对本地文件 blob 与远端 GitHub blob |
-| `--init <repo_url>` | 钉死仓库坐标，写入 `.release.json` |
-| `--install` | 按当前目录坐标安装 |
-| `--install NAME --from-repo URL` | 从指定仓库安装，**并自动记录坐标** |
-| `--update` | 更新当前目录的 skill |
-| `--update NAME` | **只说名字**更新，不用 cd |
-| `--update-repo NAME` | 更新该仓库下的**全部** skill |
-| `--list` | 列出所有已装 skill 的版本与发布坐标 |
+完整参数与副作用见 [references/COMMANDS.md](references/COMMANDS.md#完整-cli)。
 
 ## 自动定位规则
 
@@ -161,29 +131,13 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 
 ## `.release.json` 格式
 
-```json
-{
-  "repo": "https://github.com/wpc6666/self-release.git",
-  "branch": "main",
-  "subdir": ""
-}
-```
-
-- `repo`：仓库地址，支持 `https://` 与 `git@` 两种写法
-- `branch`：默认 `main`；fork 仓库常为 `master`
-- `subdir`：skill 在仓库里的相对路径，skill 在仓库根目录就留空或省略
+字段、默认值和自动维护规则见
+[references/COMMANDS.md](references/COMMANDS.md#releasejson)。
 
 ## 接入新 skill
 
-```bash
-mkdir -p <skill_dir>/scripts
-cp ~/.dsh/skills/self-release/scripts/release.py <skill_dir>/scripts/
-
-cd <skill_dir>
-python3 scripts/release.py --init https://github.com/<user>/<repo>.git --subdir "<路径>"
-```
-
-同时确认 `manifest.json` 至少有 `id` 和 `version`，最好补 `repository` 作为兜底。
+接入命令见 [references/COMMANDS.md](references/COMMANDS.md#接入已有-skill)。
+执行后确认目标 skill 的 `manifest.json` 至少含 `id`、`version`，并补 `repository` 兜底。
 
 ## 环境要求
 
