@@ -3,6 +3,14 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.5] - 2026-11-02
+
+### 重构
+
+- 将四种使用场景下沉到 `references/SCENARIOS.md`，主 SKILL 只保留执行主线。
+
+---
+
 ## [1.8.4] - 2026-11-02
 
 ### 重构
