@@ -1,6 +1,6 @@
 ---
 name: self-release
-version: 1.8.2
+version: 1.8.3
 description: 当用户说「更新这个 skill / 更新 X / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。日常一律用 `skill` 短命令（`skill update X` / `skill list` / `skill up`），不要让用户看到 `python3 .../release.py` 长路径。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（SKILL/manifest/CHANGELOG/README/index 存在时同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
@@ -133,8 +133,8 @@ python3 scripts/release.py --list
 ```
 == 已装 skill 与发布坐标 ==
 skill                 版本   仓库                                               分支/子目录
-cfec-thesis-formatter 2.2.6  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
-self-release          1.8.2  https://github.com/wpc6666/self-release.git         main
+cfec-thesis-formatter 2.2.8  https://github.com/wpc6666/cfec-thesis-formatter.git main / 重财-论文格式规范
+self-release          1.8.3  https://github.com/wpc6666/self-release.git         main
 ```
 
 **agent 处理「更新 X」时的正确做法**：先跑 `--list` 查 X 有没有坐标。有 → 直接
@@ -156,8 +156,8 @@ python3 scripts/release.py --check
 == 自动定位结果 ==
 GitHub 仓库 : https://github.com/wpc6666/<repo>.git
 本地 skill  : ~/.agents/skills/<name>
-当前版本    : v1.8.2（manifest.json 单一权威来源）
-最近 tag    : v1.8.2
+当前版本    : v1.8.3（manifest.json 单一权威来源）
+最近 tag    : v1.8.3
 HEAD        : <short-hash> feat: ...
 本地状态    : main 与 origin/main 同步
 ```

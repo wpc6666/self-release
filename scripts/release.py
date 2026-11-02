@@ -369,7 +369,7 @@ def run_check(target=None, name=None):
 
     rc, status, _ = _run(["git", "status", "--porcelain"])
     if rc == 0:
-        dirty = [l for l in status.splitlines() if l.strip()]
+        dirty = [line for line in status.splitlines() if line.strip()]
         print("工作区      : %s" % ("干净" if not dirty else "%d 个改动未提交" % len(dirty)))
 
     # 与远端同步状态
@@ -789,7 +789,9 @@ def run_update(target=None, keep_local=None, name=None):
 
     else:
         # 非 git 目录：下载 tarball 覆盖
-        import tempfile, tarfile, urllib.request
+        import tempfile
+        import tarfile
+        import urllib.request
         tmpd = tempfile.mkdtemp()
         tgz = os.path.join(tmpd, "s.tgz")
         dl = url.replace(".git", "").replace("https://github.com/",
@@ -976,7 +978,7 @@ def run_list():
         d = os.path.join(SKILLS_ROOT, name)
         if not os.path.isdir(d) or name.startswith("."):
             continue
-        repo, branch, subdir, sid = None, "main", "", name
+        repo, branch, subdir = None, "main", ""
         cfgp = os.path.join(d, ".release.json")
         if os.path.isfile(cfgp):
             try:

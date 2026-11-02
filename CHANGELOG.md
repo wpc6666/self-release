@@ -3,6 +3,15 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.3] - 2026-11-02
+
+### 修复
+
+- 清理 `new_repo.py` / `release.py` 的 Ruff 告警：移除未使用导入，
+  拆分多导入，修正歧义变量名和未使用局部变量；不改变发布行为。
+
+---
+
 ## [1.8.2] - 2026-11-01
 
 ### 修复
