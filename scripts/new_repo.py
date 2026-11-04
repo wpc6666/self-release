@@ -11,7 +11,7 @@ skill 一键上架（new_repo.py）—— 建仓库 → 开 Pages → 生成网�
     3. gh api .../pages          开 GitHub Pages
     4. 生成 index.html           用 templates/page.html 套 manifest.json
     5. gh repo edit              写 About 描述 + topics
-    6. 克隆主页仓库并插入卡片      wpc6666.github.io/index.html 自动加卡片后推送
+    6. 克隆主页仓库并插入卡片      <owner>.github.io/index.html 自动加卡片后推送
 
 用法：
     python3 scripts/new_repo.py --dry-run           # 预览将执行的全部动作
@@ -33,8 +33,26 @@ import argparse
 
 AUTHOR_NAME = os.environ.get("RELEASE_AUTHOR_NAME") or "白澤 程"
 AUTHOR_EMAIL = os.environ.get("RELEASE_AUTHOR_EMAIL") or ""
-OWNER = "wpc6666"
-HOMEPAGE_REPO = "wpc6666.github.io"
+
+
+def _gh_login() -> str:
+    """当前 gh 登录账号；失败时返回空串。"""
+    try:
+        out = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+OWNER = (
+    os.environ.get("RELEASE_OWNER")
+    or _gh_login()
+    or "wpc6666"
+)
+HOMEPAGE_REPO = os.environ.get("RELEASE_HOMEPAGE_REPO") or ("%s.github.io" % OWNER)
 HOMEPAGE_URL = "https://%s.github.io/" % OWNER
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -75,6 +93,8 @@ def load_patterns():
     fallback = [
         "~/." + "agents",
         "~" + "/IT/",
+        r"\$\{?HOME\}?/\.agents",
+        r"\$\{?HOME\}?/IT/",
         "Dev" + "Config",
         "dsh-" + "agents",
         "AGENTS" + r"\.md",
@@ -238,10 +258,20 @@ def step_gen_page(slug, mf, dry_run, force=False):
     cfg_rows = "\n".join(
         "<tr><td><code>%s</code></td><td>%s</td></tr>" % (c, d) for c, d in cfgs)
 
-    related = [
-        ("macOS 中文绘图配置", "https://github.com/%s/plot-cjk-config" % OWNER,
-         "R / Python / Stata 中文出图，300 DPI，不出豆腐块"),
-    ]
+    related = []
+    try:
+        with open(os.path.join(SKILL_DIR, "manifest.json"), encoding="utf-8") as fh:
+            for item in json.load(fh).get("related", []) or []:
+                if isinstance(item, dict):
+                    name, url, desc = item.get("name", ""), item.get("url", ""), item.get("desc", "")
+                elif isinstance(item, (list, tuple)) and len(item) >= 3:
+                    name, url, desc = item[0], item[1], item[2]
+                else:
+                    continue
+                if url:
+                    related.append((str(name), str(url), str(desc)))
+    except Exception:
+        pass
     related_html = "\n".join(
         '<li><a href="%s">%s</a> —— %s</li>' % (u, n, d) for n, u, d in related)
 

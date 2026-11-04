@@ -3,6 +3,20 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.9.0] - 2026-11-04
+
+### 修复
+
+- 仓库解析顺序改为 `.release.json` → 自身 `.git` → `manifest.repository` → `SKILL.md` 链接 → 上级 `.git`；
+  上级容器仓库只做最后兜底，并打印风险提示，避免把子目录 skill 误推到容器仓库。
+- `new_repo.py` 的 OWNER 改为 `RELEASE_OWNER` → `gh api user` → 常量兜底；
+  `HOMEPAGE_REPO` 可用 `RELEASE_HOMEPAGE_REPO` 覆盖。
+- 新页面的 related 列表改读 `manifest.json` 的 `related` 字段，不再硬塞固定项目。
+- 提交邮箱自检改为读取 `gh api user` 的登录名，不再写死账号字符串。
+- `patterns/private.txt` 增加 HOME 变量形式的私有路径写法。
+
+---
+
 ## [1.8.5] - 2026-11-02
 
 ### 重构

@@ -1,6 +1,6 @@
 ---
 name: self-release
-version: 1.8.5
+version: 1.9.0
 description: 当用户说「更新这个 skill / 更新 X / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。日常一律用 `skill` 短命令（`skill update X` / `skill list` / `skill up`），不要让用户看到 `python3 .../release.py` 长路径。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（SKILL/manifest/CHANGELOG/README/index 存在时同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
@@ -58,8 +58,8 @@ python3 scripts/release.py --check
 == 自动定位结果 ==
 GitHub 仓库 : https://github.com/wpc6666/<repo>.git
 本地 skill  : <skill 目录>/<name>
-当前版本    : v1.8.5（manifest.json 单一权威来源）
-最近 tag    : v1.8.5
+当前版本    : v1.9.0（manifest.json 单一权威来源）
+最近 tag    : v1.9.0
 HEAD        : <short-hash> feat: ...
 本地状态    : main 与 origin/main 同步
 ```
@@ -145,7 +145,11 @@ git push origin <branch>
 提交前自查：
 
 ```bash
-git config user.email | grep -q wpc6666 || echo "邮箱不对，需修正"
+GH_USER="$(gh api user --jq .login 2>/dev/null || true)"
+EMAIL="$(git config user.email)"
+if [ -n "$GH_USER" ] && ! printf '%s' "$EMAIL" | grep -q "$GH_USER"; then
+  echo "邮箱与 GitHub 账号 $GH_USER 不一致，需修正"
+fi
 ```
 
 `<type>` 取 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`。

@@ -8,6 +8,8 @@
 # 私有目录与路径
 ~/.agents
 ~/IT/
+\$\{?HOME\}?/\.agents
+\$\{?HOME\}?/IT/
 /Users/[a-zA-Z0-9._-]+/
 
 # 内部仓库 / 手册名

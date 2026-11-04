@@ -106,31 +106,23 @@ def _read_release_cfg():
 
 
 def detect_repo():
-    """按四级优先级解析 GitHub 仓库地址，找不到返回 None。"""
+    """按优先级解析 GitHub 仓库地址，找不到返回 None。
+
+    顺序：.release.json → 自身 .git → manifest.repository → SKILL.md 链接
+          → 上级目录 .git（最后兜底，标记为容器仓库）。
+    上级 .git 放在最后，避免把子目录里的 skill 误解析成容器仓库。
+    """
     # ⓿ .release.json 显式配置（最优先，钉死后永不再猜）
     cfg = _read_release_cfg()
     if cfg.get("repo"):
         return cfg["repo"], ".release.json 显式配置"
 
-    # ① .git/config 的 remote origin
+    # ① 自身 .git/config 的 remote origin
     git_cfg = os.path.join(SKILL_DIR, ".git", "config")
     if os.path.isfile(git_cfg):
         rc, out, _ = _run(["git", "config", "--get", "remote.origin.url"])
         if rc == 0 and out:
             return out, ".git/config"
-
-    # 向上找最近一层 .git（skill 可能在仓库子目录）
-    probe = SKILL_DIR
-    for _ in range(6):
-        parent = os.path.dirname(probe)
-        if parent == probe:
-            break
-        git_cfg2 = os.path.join(parent, ".git", "config")
-        if os.path.isfile(git_cfg2):
-            rc, out, _ = _run(["git", "config", "--get", "remote.origin.url"], cwd=parent)
-            if rc == 0 and out:
-                return out, ".git/config（上级目录 %s）" % parent
-        probe = parent
 
     # ② manifest.json 的 repository / homepage
     if os.path.isfile(MANIFEST_JSON):
@@ -159,12 +151,22 @@ def detect_repo():
         except Exception:
             pass
 
+    # ④ 向上找最近一层 .git（最后兜底；skill 可能就在容器仓库子目录）
+    probe = SKILL_DIR
+    for _ in range(6):
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            break
+        git_cfg2 = os.path.join(parent, ".git", "config")
+        if os.path.isfile(git_cfg2):
+            rc, out, _ = _run(["git", "config", "--get", "remote.origin.url"], cwd=parent)
+            if rc == 0 and out:
+                return out, "上级目录 .git（容器仓库 %s；建议补 .release.json）" % parent
+        probe = parent
+
     return None, "未找到"
 
 
-# ----------------------------------------------------------
-#  自动定位：版本
-# ----------------------------------------------------------
 def detect_version():
     """按三级优先级解析版本号，返回 (version, 来源)。"""
     if os.path.isfile(MANIFEST_JSON):
@@ -345,6 +347,9 @@ def run_check(target=None, name=None):
     print("GitHub 仓库 : %s" % (repo or "❌ 未找到（需要手工确认）"))
     if repo:
         print("              （来源：%s）" % repo_src)
+        if "上级目录 .git" in repo_src:
+            print("⚠️  这是容器仓库，不是该 skill 的独立仓库；"
+                  "建议补 .release.json 或 manifest.repository。")
     print("当前版本    : v%s" % version)
     print("              （来源：%s）" % ver_src)
 
@@ -380,9 +385,11 @@ def run_check(target=None, name=None):
     print()
     if not repo:
         print("⚠️  未定位到仓库地址。按优先级检查：")
-        print("   1. .git/config 的 [remote \"origin\"] url")
-        print("   2. manifest.json 的 repository / homepage 字段")
-        print("   3. SKILL.md 正文第一个 github.com 链接")
+        print("   1. .release.json 的 repo")
+        print("   2. 自身 .git/config 的 [remote \"origin\"] url")
+        print("   3. manifest.json 的 repository / homepage 字段")
+        print("   4. SKILL.md 正文第一个 github.com 链接")
+        print("   5. 上级目录 .git（容器仓库，仅最后兜底）")
         print("   都找不到 → 停下来问用户，不要猜，不要新建仓库。")
     return 0 if repo else 2
 
