@@ -163,7 +163,7 @@
 ### 说明
 
 用户不再需要看长路径命令。对 agent 说「更新这个 skill」即可，
-agent 按 AGENTS.md 直接跑 `skill update X`。
+agent 直接跑 `skill update X`。
 
 ## [1.6.0] - 2026-10-19
 

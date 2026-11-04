@@ -57,7 +57,7 @@ python3 scripts/release.py --check
 ```
 == 自动定位结果 ==
 GitHub 仓库 : https://github.com/wpc6666/<repo>.git
-本地 skill  : ~/.agents/skills/<name>
+本地 skill  : <skill 目录>/<name>
 当前版本    : v1.8.5（manifest.json 单一权威来源）
 最近 tag    : v1.8.5
 HEAD        : <short-hash> feat: ...
@@ -262,4 +262,4 @@ skill init https://github.com/<user>/<repo>.git --subdir "<路径>"
 
 ## 与仓库发布流程的关系
 
-**任何 skill 的发布都走这套流程。** 若发布的是仓库本身的 README / index.html / Pages，另见 `AGENTS.md` 的「仓库维护」章节。
+**任何 skill 的发布都走这套流程。** 若发布的是仓库本身的 README / index.html / Pages，另见仓库的维护文档。

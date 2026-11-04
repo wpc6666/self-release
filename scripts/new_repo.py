@@ -173,8 +173,6 @@ def step_gen_page(slug, mf, dry_run, force=False):
     related = [
         ("macOS 中文绘图配置", "https://github.com/%s/plot-cjk-config" % OWNER,
          "R / Python / Stata 中文出图，300 DPI，不出豆腐块"),
-        ("全局行为准则", "https://github.com/%s/dsh-agents" % OWNER,
-         "跨工具 AGENTS.md，符号链接分发到 DSH / Codex / Claude"),
     ]
     related_html = "\n".join(
         '<li><a href="%s">%s</a> —— %s</li>' % (u, n, d) for n, u, d in related)

@@ -159,7 +159,6 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 ## 相关项目
 
 - [plot-cjk-config](https://github.com/wpc6666/plot-cjk-config) — macOS 中文绘图配置，R / Python / Stata 三套工具链不出豆腐块
-- [dsh-agents](https://github.com/wpc6666/dsh-agents) — 跨工具 AI Agent 全局行为准则
 
 ## 许可
 
