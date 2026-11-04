@@ -1,0 +1,19 @@
+# 发布前要拦住的私有约定（正则，一行一条，空行与 # 开头忽略）
+#
+# 单一来源：self-release 的 scripts/new_repo.py 与 DevConfig 的
+# agents/scripts/public_scan.sh 都读本文件。新增约定只改这里一处。
+#
+# 注意：本文件自身包含这些字面量，两个扫描器都把它排除在外。
+
+# 私有目录与路径
+~/.agents
+~/IT/
+/Users/[a-zA-Z0-9._-]+/
+
+# 内部仓库 / 手册名
+DevConfig
+dsh-agents
+AGENTS\.md
+
+# 个人邮箱
+users\.noreply\.github\.com

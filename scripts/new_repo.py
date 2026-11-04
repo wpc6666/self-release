@@ -65,22 +65,36 @@ def author_email():
     return email
 
 
-# 发布前要拦住的私有约定（拼接写法，避免本文件自匹配）
-PRIVATE_PATTERNS = [
-    "~/." + "agents",
-    "~/IT/",
-    "Dev" + "Config",
-    "dsh-" + "agents",
-    "AGENTS" + r"\.md",
-    r"users\.noreply\.github\.com",
-    r"/Users/[a-zA-Z0-9._-]+/",
-]
+# 私有约定规则的单一来源：patterns/private.txt（每行一条正则）。
+# 仓库治理侧的 public_scan.sh 也读同一份文件，新增规则只改那里。
+PATTERNS_FILE = os.path.join(SKILL_DIR, "patterns", "private.txt")
+
+
+def load_patterns():
+    """读规则文件；缺失时退回内置最小集合。"""
+    fallback = [
+        "~/." + "agents",
+        "~" + "/IT/",
+        "Dev" + "Config",
+        "dsh-" + "agents",
+        "AGENTS" + r"\.md",
+        r"users\.noreply\.github\.com",
+        r"/Users/[a-zA-Z0-9._-]+/",
+    ]
+    try:
+        with open(PATTERNS_FILE, "r", encoding="utf-8") as fh:
+            rules = [ln.strip() for ln in fh
+                     if ln.strip() and not ln.strip().startswith("#")]
+        return rules or fallback
+    except OSError:
+        return fallback
 
 
 def scan_private(root):
     """扫描目录里的私有约定，返回命中行（跳过本脚本自身）。"""
     self_path = os.path.abspath(__file__)
-    rx = re.compile("|".join(PRIVATE_PATTERNS))
+    patterns_dir = os.path.dirname(os.path.abspath(PATTERNS_FILE))
+    rx = re.compile("|".join(load_patterns()))
     hits = []
     for base, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs
@@ -88,6 +102,8 @@ def scan_private(root):
         for name in files:
             path = os.path.join(base, name)
             if os.path.abspath(path) == self_path:
+                continue
+            if os.path.abspath(base) == patterns_dir:
                 continue
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as fh:

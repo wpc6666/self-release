@@ -191,6 +191,7 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 
 | 步 | 动作 | 幂等行为 |
 |---|---|---|
+| 0 | 扫 `patterns/private.txt` 里的私有约定，命中直接中止 | 每次执行 |
 | 1 | `gh repo create` 建公开仓库并推送 | 仓库已存在则跳过 |
 | 2 | 套 `templates/page.html` 生成 `index.html` | 每次重新生成 |
 | 3 | 提交并推送 | 无改动则跳过提交 |
@@ -209,6 +210,10 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 | `--section 学习知识库` | 指定主页分区，默认「工具项目」 |
 
 **前置条件**：`gh auth status` 通过；skill 目录里有 `manifest.json`（提供 id / name / description / version / tags）。
+
+**通用化规则**：只看 `patterns/private.txt`，一行一条正则（空行和 `#` 注释忽略）。
+这是**唯一来源**——仓库治理侧的 `public_scan.sh` 也读同一份文件，新增私有约定只改这里，
+不要在两处分别维护。提交邮箱走环境变量 `RELEASE_AUTHOR_EMAIL`，缺省读本机 `git config`。
 
 > ⚠️ **`sync.sh audit` 只核查不修复**。它发现主页漏卡片只会打印「补主页卡片：编辑 ... 后 push」，不会自己改。要自动补用 `new_repo.py`。
 
