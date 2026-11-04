@@ -134,8 +134,8 @@ diff -r --exclude '__pycache__' <skill_dir> "$REPO/<skill_subdir>"
 ```bash
 cd "$REPO"
 git add -A
-git -c user.name="白澤 程" \
-    -c user.email="87405429+wpc6666@users.noreply.github.com" \
+git -c user.name="${RELEASE_AUTHOR_NAME}" \
+    -c user.email="${RELEASE_AUTHOR_EMAIL:?请先设置 RELEASE_AUTHOR_EMAIL}" \
     commit -m "<type>: <一句话>"
 git push origin <branch>
 ```

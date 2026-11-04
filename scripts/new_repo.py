@@ -31,8 +31,8 @@ import shutil
 import subprocess
 import argparse
 
-AUTHOR_NAME = "白澤 程"
-AUTHOR_EMAIL = "87405429+wpc6666@users.noreply.github.com"
+AUTHOR_NAME = os.environ.get("RELEASE_AUTHOR_NAME") or "白澤 程"
+AUTHOR_EMAIL = os.environ.get("RELEASE_AUTHOR_EMAIL") or ""
 OWNER = "wpc6666"
 HOMEPAGE_REPO = "wpc6666.github.io"
 HOMEPAGE_URL = "https://%s.github.io/" % OWNER
@@ -46,6 +46,58 @@ SECTIONS = ["学习知识库", "工具项目", "其他工具"]
 def _err(msg):
     sys.stderr.write("错误: %s\n" % msg)
     sys.exit(1)
+
+
+def _git_cfg(key):
+    try:
+        out = subprocess.run(["git", "config", "--get", key],
+                             capture_output=True, text=True)
+        return out.stdout.strip()
+    except Exception:
+        return ""
+
+
+def author_email():
+    """提交邮箱：优先 RELEASE_AUTHOR_EMAIL，其次本机 git 配置；都没有就中止。"""
+    email = AUTHOR_EMAIL or _git_cfg("user.email")
+    if not email:
+        _err("未设置提交邮箱：export RELEASE_AUTHOR_EMAIL=... 或先 git config --global user.email ...")
+    return email
+
+
+# 发布前要拦住的私有约定（拼接写法，避免本文件自匹配）
+PRIVATE_PATTERNS = [
+    "~/." + "agents",
+    "~/IT/",
+    "Dev" + "Config",
+    "dsh-" + "agents",
+    "AGENTS" + r"\.md",
+    r"users\.noreply\.github\.com",
+    r"/Users/[a-zA-Z0-9._-]+/",
+]
+
+
+def scan_private(root):
+    """扫描目录里的私有约定，返回命中行（跳过本脚本自身）。"""
+    self_path = os.path.abspath(__file__)
+    rx = re.compile("|".join(PRIVATE_PATTERNS))
+    hits = []
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs
+                   if d not in {".git", "node_modules", ".venv", "__pycache__"}]
+        for name in files:
+            path = os.path.join(base, name)
+            if os.path.abspath(path) == self_path:
+                continue
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                    for lineno, line in enumerate(fh, 1):
+                        if rx.search(line):
+                            hits.append("%s:%d: %s" % (
+                                os.path.relpath(path, root), lineno, line.strip()[:120]))
+            except OSError:
+                continue
+    return hits
 
 
 def _warn(msg):
@@ -106,7 +158,7 @@ def step_create_repo(slug, mf, dry_run):
     if not os.path.isdir(os.path.join(SKILL_DIR, ".git")):
         _run(["git", "init", "-b", "main"], cwd=SKILL_DIR)
     _run(["git", "config", "user.name", AUTHOR_NAME], cwd=SKILL_DIR)
-    _run(["git", "config", "user.email", AUTHOR_EMAIL], cwd=SKILL_DIR)
+    _run(["git", "config", "user.email", author_email()], cwd=SKILL_DIR)
 
     rc, out, err = _run(
         ["gh", "repo", "create", slug, "--public",
@@ -373,7 +425,7 @@ def step_homepage(slug, mf, section_hint, dry_run):
     with io.open(idx, "w", encoding="utf-8") as f:
         f.write(new_html)
     _run(["git", "config", "user.name", AUTHOR_NAME], cwd=tmp)
-    _run(["git", "config", "user.email", AUTHOR_EMAIL], cwd=tmp)
+    _run(["git", "config", "user.email", author_email()], cwd=tmp)
     _run(["git", "add", "index.html"], cwd=tmp)
     rc, out, err = _run(["git", "commit", "-m", "docs: 主页新增 %s 卡片" % slug], cwd=tmp)
     if rc != 0:
@@ -419,6 +471,18 @@ def main(argv=None):
     print("  仓库名     : %s/%s" % (OWNER, slug))
     print("  版本       : %s" % mf.get("version", "?"))
     print("  模式       : %s" % ("预览（--yes 才真执行）" if dry_run else "执行"))
+    print()
+
+    print("[0/6] 通用化检查")
+    hits = scan_private(SKILL_DIR)
+    if hits:
+        for h in hits[:20]:
+            print("  " + h)
+        if len(hits) > 20:
+            print("  …共 %d 处" % len(hits))
+        _err("检出 %d 处私有约定（私有路径 / 内部名 / 个人邮箱），发布中止。"
+             "改成通用写法后再试。" % len(hits))
+    print("  ✓ 未发现私有约定")
     print()
 
     created = step_create_repo(slug, mf, dry_run)

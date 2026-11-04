@@ -44,9 +44,6 @@ import shutil
 import subprocess
 import argparse
 
-AUTHOR_NAME = "白澤 程"
-AUTHOR_EMAIL = "87405429+wpc6666@users.noreply.github.com"
-
 # skill 根目录解析：
 #   ① 显式环境变量 RELEASE_SKILL_DIR（最高优先）
 #   ② 当前工作目录（若里面有 SKILL.md 或 manifest.json）——支持「cd 到目标 skill 再跑别的副本」
