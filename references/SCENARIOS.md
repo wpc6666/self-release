@@ -16,8 +16,8 @@
 **agent 处理「我新电脑上啥都没有，装一下 X」时的正确做法**：
 
 1. 先跑上面的 curl 装 self-release（一条命令，幂等，已装则自动转更新）
-2. 再 `skill init <X的仓库地址>`
-3. 最后 `--install --target ~/.dsh/skills/X`
+2. 再 `cd <skills目录>/X && skill init <X的仓库地址>`（或用 `--target <skills目录>/X`）
+3. 最后 `skill install X --from-repo <X的仓库地址>`
 
 第 2 步的仓库地址只需提供一次。
 

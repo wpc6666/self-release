@@ -1,9 +1,11 @@
 ---
 name: self-release
-version: 1.9.0
+version: 1.9.1
 description: 当用户说「更新这个 skill / 更新 X / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。日常一律用 `skill` 短命令（`skill update X` / `skill list` / `skill up`），不要让用户看到 `python3 .../release.py` 长路径。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（SKILL/manifest/CHANGELOG/README/index 存在时同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
+
+> 安装根目录默认 `~/.dsh/skills`；若你的中央目录是 `<skills目录>`，设 `DSH_HOME=<skills目录的上一级>`。
 
 # Skill 自更新与发布
 
@@ -58,8 +60,8 @@ python3 scripts/release.py --check
 == 自动定位结果 ==
 GitHub 仓库 : https://github.com/wpc6666/<repo>.git
 本地 skill  : <skill 目录>/<name>
-当前版本    : v1.9.0（manifest.json 单一权威来源）
-最近 tag    : v1.9.0
+当前版本    : v1.9.1（manifest.json 单一权威来源）
+最近 tag    : v1.9.1
 HEAD        : <short-hash> feat: ...
 本地状态    : main 与 origin/main 同步
 ```
@@ -69,9 +71,9 @@ HEAD        : <short-hash> feat: ...
 1. **仓库地址**，按优先级找：
    - `.release.json` 的 `repo`（最优先，钉死后永不再猜）
    - skill 目录下 `.git/config` 的 `[remote "origin"]` url
-   - 向上最多 6 层找 `.git`（skill 在仓库子目录时）
    - `manifest.json` 的 `repository` / `homepage` 字段
    - `SKILL.md` 正文里第一个 `https://github.com/<user>/<repo>` 链接
+   - 向上最多 6 层找 `.git`（容器仓库，**最后兜底**；命中时提示风险）
    - 都找不到 → **停下来问用户**，不要猜
 2. **当前版本**，按优先级找：
    - `manifest.json` 的 `version`
@@ -124,7 +126,8 @@ rsync -a --delete --exclude '.git' --exclude '__pycache__' \
   <skill_dir>/ "$REPO/<skill_subdir>/"
 
 # 必须一字不差
-diff -r --exclude '__pycache__' <skill_dir> "$REPO/<skill_subdir>"
+diff -r --exclude '.git' --exclude '__pycache__' --exclude '.DS_Store' \
+  <skill_dir> "$REPO/<skill_subdir>"
 ```
 
 `diff -r` 无输出才算过。
@@ -134,8 +137,11 @@ diff -r --exclude '__pycache__' <skill_dir> "$REPO/<skill_subdir>"
 ```bash
 cd "$REPO"
 git add -A
-git -c user.name="${RELEASE_AUTHOR_NAME}" \
-    -c user.email="${RELEASE_AUTHOR_EMAIL:?请先设置 RELEASE_AUTHOR_EMAIL}" \
+NAME="${RELEASE_AUTHOR_NAME:-$(git config user.name)}"
+EMAIL="${RELEASE_AUTHOR_EMAIL:-$(git config user.email)}"
+: "${NAME:?请先设置 RELEASE_AUTHOR_NAME 或 git config user.name}"
+: "${EMAIL:?请先设置 RELEASE_AUTHOR_EMAIL 或 git config user.email}"
+git -c user.name="$NAME" -c user.email="$EMAIL" \
     commit -m "<type>: <一句话>"
 git push origin <branch>
 ```

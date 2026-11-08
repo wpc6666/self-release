@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.1-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -30,7 +30,7 @@ python3 scripts/release.py --update
 
 所以「不需要原始链接」的准确含义是：**链接只需提供一次，之后写进 skill 自己的配置，永远不用再提供。**
 
-新电脑上连本 skill 都没有时，用上面的 `install.sh` 破局——那是唯一一次需要记住 URL 的地方。
+新电脑上连本 skill 都没有时，用 [COMMANDS.md 的安装引导](references/COMMANDS.md#安装引导) 破局——那是唯一一次需要记住 URL 的地方。
 
 ## 一条命令安装
 

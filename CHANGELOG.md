@@ -3,6 +3,17 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.9.1] - 2026-11-08
+
+### 修复
+
+- 手工兜底顺序改为“manifest/SKILL 链接在前、向上 6 层 `.git` 最后”，与 `detect_repo()` 一致。
+- 安装根目录说明补充 `DSH_HOME` 用法，避免 `~/.dsh` 与 `~/.agents` 双份副本。
+- `skill init` 示例补 `cd`/`--target`；`--install --target` 改为可执行的 `skill install`。
+- `diff -r` 排除 `.git`/`.DS_Store`；提交身份支持 git config 兜底。
+
+---
+
 ## [1.9.0] - 2026-11-04
 
 ### 修复

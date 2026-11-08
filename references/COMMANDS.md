@@ -10,7 +10,8 @@
 curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
 ```
 
-默认安装到 `~/.dsh/skills/self-release/`，可用 `DSH_HOME` 修改根目录。
+默认安装到 `~/.dsh/skills/self-release/`，可用 `DSH_HOME` 修改根目录；
+本机中央目录是 `<skills目录>` 时，用 `DSH_HOME=<skills目录的上一级>` 让安装落到同一处。
 安装是幂等的：已安装时转为更新流程。
 
 ## 日常命令
@@ -67,7 +68,7 @@ python3 scripts/release.py --list
 
 ```bash
 mkdir -p <skill_dir>/scripts
-cp ~/.dsh/skills/self-release/scripts/release.py <skill_dir>/scripts/
+cp <skills目录>/self-release/scripts/release.py <skill_dir>/scripts/
 
 cd <skill_dir>
 python3 scripts/release.py --init https://github.com/<user>/<repo>.git --subdir "<路径>"
