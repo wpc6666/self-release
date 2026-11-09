@@ -21,8 +21,30 @@ set -uo pipefail
 
 SELF_REPO="wpc6666/self-release"
 INSTALL_URL="https://raw.githubusercontent.com/${SELF_REPO}/main/install.sh"
-SKILLS_ROOT="${DSH_HOME:-${HOME}/.dsh}/skills"
+
+# 中央 skills 目录解析（与 release.py 保持一致）：
+#   1. SKILLS_HOME 直接指定
+#   2. 安装时写下的配置 ~/.config/self-release/skills-root
+#   3. DSH_HOME/skills（兼容旧用法）
+#   4. XDG 数据目录（默认 ~/.local/share/skills）
+_resolve_skills_root() {
+    if [[ -n "${SKILLS_HOME:-}" ]]; then
+        printf '%s\n' "${SKILLS_HOME}"; return
+    fi
+    local cfg="${XDG_CONFIG_HOME:-${HOME}/.config}/self-release/skills-root"
+    if [[ -r "$cfg" ]]; then
+        local root=""
+        IFS= read -r root < "$cfg" || true
+        if [[ -n "$root" ]]; then printf '%s\n' "$root"; return; fi
+    fi
+    if [[ -n "${DSH_HOME:-}" ]]; then
+        printf '%s\n' "${DSH_HOME}/skills"; return
+    fi
+    printf '%s\n' "${XDG_DATA_HOME:-${HOME}/.local/share}/skills"
+}
+SKILLS_ROOT="$(_resolve_skills_root)"
 SELF_DIR="${SKILLS_ROOT}/self-release"
+export SKILLS_HOME="${SKILLS_ROOT}"
 
 _dim()  { printf '\033[2m%s\033[0m\n' "$*"; }
 _err()  { printf '\033[31m错误:\033[0m %s\n' "$*" >&2; }

@@ -11,7 +11,8 @@
 **解法**：执行 [COMMANDS.md](COMMANDS.md#安装引导) 的 curl
 引导。这一步是唯一需要仓库链接的地方，之后永久免链接。
 
-装到 `~/.dsh/skills/self-release/`（可用 `DSH_HOME` 改根目录），并自动写入 `.release.json`。
+装到中央 skills 目录（可用 `SKILLS_HOME=<skills目录>` 指定），并自动写入
+`.release.json` 与 `~/.config/self-release/skills-root`。
 
 **agent 处理「我新电脑上啥都没有，装一下 X」时的正确做法**：
 
@@ -28,7 +29,7 @@
 ```bash
 python3 scripts/release.py --check     # 先定位
 python3 scripts/release.py --bump minor
-# …按下方「第二步」到「第七步」执行…
+# …按 ../SKILL.md 的发布流程执行…
 ```
 
 ### 场景 B：用户说「更新 X」——只说名字就够，不用 cd
@@ -37,7 +38,7 @@ python3 scripts/release.py --bump minor
 skill update X
 ```
 
-脚本按名字定位到 `$DSH_HOME/skills/X`，读它的 `.release.json` → `git fetch` +
+脚本按名字定位到 `<skills目录>/X`，读它的 `.release.json` → `git fetch` +
 `git reset --hard origin/<branch>` → 保留本地 `.release.json`。
 
 如果那个目录不是 git 仓库（比如当初是拷贝过去的），脚本自动改用 tarball 覆盖下载，效果一样。
@@ -45,10 +46,11 @@ skill update X
 **整个仓库一起更新**（一个仓库里放了多个 skill 时）：
 
 ```bash
-skill update X
+python3 scripts/release.py --update-repo X
 ```
 
 解析出 X 所属仓库 → 扫描所有已装 skill → 坐标相同的全部更新一遍。
+（`skill update X` 只更新 X 自身，不会连带同仓库的其他 skill。）
 
 ### 场景 C：新机器，本地还没有这个 skill
 

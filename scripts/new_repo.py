@@ -55,7 +55,15 @@ OWNER = (
 HOMEPAGE_REPO = os.environ.get("RELEASE_HOMEPAGE_REPO") or ("%s.github.io" % OWNER)
 HOMEPAGE_URL = "https://%s.github.io/" % OWNER
 
-SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 上架对象是“当前 skill 目录”，不是 self-release 自己。
+# 优先 cwd；只有 cwd 不像 skill 目录时才退回脚本所在目录。
+_CWD = os.getcwd()
+if any(os.path.isfile(os.path.join(_CWD, f))
+       for f in ("SKILL.md", "manifest.json", ".release.json")):
+    SKILL_DIR = _CWD
+else:
+    SKILL_DIR = _HERE
 
 # 主页分区关键词 → 该分区标题（用于 --section 模糊匹配）
 SECTIONS = ["学习知识库", "工具项目", "其他工具"]
@@ -85,7 +93,7 @@ def author_email():
 
 # 私有约定规则的单一来源：patterns/private.txt（每行一条正则）。
 # 仓库治理侧的 public_scan.sh 也读同一份文件，新增规则只改那里。
-PATTERNS_FILE = os.path.join(SKILL_DIR, "patterns", "private.txt")
+PATTERNS_FILE = os.path.join(_HERE, "patterns", "private.txt")
 
 
 def load_patterns():
@@ -185,6 +193,13 @@ def step_create_repo(slug, mf, dry_run):
     _info("\n[1/6] 建仓库 %s/%s" % (OWNER, slug))
     if _repo_exists(slug):
         _info("  仓库已存在，跳过创建")
+        # 仓库存在不代表本地目录已初始化；后续 step_push 可能在父仓库里执行。
+        if not os.path.exists(os.path.join(SKILL_DIR, ".git")):
+            _run(["git", "init", "-b", "main"], cwd=SKILL_DIR)
+        rc, out, _ = _run(["git", "remote", "get-url", "origin"], cwd=SKILL_DIR)
+        if rc != 0:
+            _run(["git", "remote", "add", "origin",
+                  "https://github.com/%s/%s.git" % (OWNER, slug)], cwd=SKILL_DIR)
         return False
     if dry_run:
         _info("  [dry-run] gh repo create %s/%s --public --source=. --push" % (OWNER, slug))
@@ -212,7 +227,7 @@ def step_create_repo(slug, mf, dry_run):
 # ----------------------------------------------------------
 def step_gen_page(slug, mf, dry_run, force=False):
     _info("\n[2/6] 生成 index.html")
-    tpl_path = os.path.join(SKILL_DIR, "templates", "page.html")
+    tpl_path = os.path.join(_HERE, "templates", "page.html")
     if not os.path.isfile(tpl_path):
         _warn("  没有 templates/page.html，跳过网页生成")
         return False
@@ -326,6 +341,8 @@ def step_push(slug, dry_run):
         _info("  [dry-run] git add -A && git commit && git push")
         return False
     rc, out, err = _run(["git", "add", "-A"], cwd=SKILL_DIR)
+    if rc != 0:
+        _err("git add 失败：%s" % (err or out))
     rc, out, err = _run(["git", "status", "--porcelain"], cwd=SKILL_DIR)
     if not out.strip():
         _info("  没有改动，跳过提交")
@@ -336,9 +353,8 @@ def step_push(slug, dry_run):
             _err("提交失败：%s" % (err or out))
     rc, out, err = _run(["git", "push", "-u", "origin", "main"], cwd=SKILL_DIR)
     if rc != 0 and "already up-to-date" not in (out + err).lower():
-        _warn("  推送返回非零：%s" % (err or out))
-    else:
-        _info("  ✓ 已推送")
+        _err("推送失败：%s" % (err or out))
+    _info("  ✓ 已推送")
     return True
 
 
@@ -376,7 +392,10 @@ def step_about(slug, mf, dry_run):
         return False
     cmd = ["gh", "repo", "edit", "%s/%s" % (OWNER, slug), "--description", desc]
     for t in tags:
-        cmd += ["--add-topic", re.sub(r"[^a-z0-9-]", "-", str(t).lower())]
+        topic = re.sub(r"[^a-z0-9-]", "-", str(t).lower()).strip("-")
+        # 纯中文 tag 会归一化成空/纯连字符；GitHub topic 只接受字母数字连字符。
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*", topic or ""):
+            cmd += ["--add-topic", topic]
     rc, out, err = _run(cmd)
     if rc != 0:
         _warn("  写 About 失败：%s" % (err or out))

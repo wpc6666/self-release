@@ -3,6 +3,20 @@
 本文件记录 `self-release` skill 的所有版本变更。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.10.0] - 2026-11-09
+
+### 变更
+
+- 默认安装根目录不再写死 `~/.dsh/skills`：优先 `SKILLS_HOME`，安装时把实际路径记到
+  `~/.config/self-release/skills-root`，`skill` 与 `release.py` 统一读取；未指定时回退 XDG
+  的 `~/.local/share/skills`，`DSH_HOME` 保留兼容。
+- 安装器在更新流程中也会刷新 `skill` 短命令，并备份旧版本。
+- `subdir` 增加路径校验，拒绝绝对路径、`.`、`..`，避免安装/更新时移动或删除技能目录之外的内容。
+- 无显式坐标时不再把父级容器仓库当作更新源，防止把整个父级仓库覆盖进单个 skill。
+- 修复自身 `.git` 的 remote 查询未指定 `cwd`、`new_repo.py` 始终把 self-release 当上架目标的问题。
+
+---
+
 ## [1.9.2] - 2026-11-08
 
 ### 修复

@@ -3,7 +3,7 @@
 > 用户说一句「更新这个 skill」或「更新 X」，agent 自动定位 GitHub 仓库和版本，走完改版 → 验证 → 推送 → 打 tag 全流程。**不需要你记住或粘贴任何仓库链接。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.9.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.10.0-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
 ## 解决什么问题
@@ -61,7 +61,7 @@ skill verify         # 本地 vs 远端 blob 一致性
 skill update X
 ```
 
-脚本按名字定位到 `$DSH_HOME/skills/X`，然后自动区分两条路径：
+脚本按名字定位到 `<skills目录>/X`，然后自动区分两条路径：
 
 - 目录是 git 仓库 → `git fetch` + `git reset --hard origin/<branch>`
 - 目录不是 git 仓库（当初是拷贝的）→ 下载 tarball 覆盖
@@ -123,7 +123,7 @@ python3 <self-release>/scripts/new_repo.py --yes       # 执行
 
 | 目标 | 优先级 |
 |---|---|
-| **仓库地址** | `.release.json` 的 `repo` → `.git/config` 的 `origin` → 向上 6 层找 `.git` → `manifest.json` 的 `repository`/`homepage` → `SKILL.md` 正文首个 GitHub 链接 |
+| **仓库地址** | `.release.json` 的 `repo` → `.git/config` 的 `origin` → `manifest.json` 的 `repository`/`homepage` → `SKILL.md` 正文首个 GitHub 链接 → 向上 6 层找 `.git`（最后兜底，容器仓库只提示不用于更新） |
 | **当前版本** | `manifest.json` 的 `version` → `SKILL.md` frontmatter 的 `version:` → 一级标题里的 `vX.Y.Z` |
 | **分支名** | `git branch --show-current` |
 

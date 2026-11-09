@@ -1,11 +1,11 @@
 ---
 name: self-release
-version: 1.9.2
+version: 1.10.0
 description: 当用户说「更新这个 skill / 更新 X / 发布这个 skill / 上架 / 上线 / 打个 tag 推上去」时使用。日常一律用 `skill` 短命令（`skill update X` / `skill list` / `skill up`），不要让用户看到 `python3 .../release.py` 长路径。自动定位 GitHub 仓库、当前版本与分支，完成版本递增（SKILL/manifest/CHANGELOG/README/index 存在时同步）→ 验证 → 提交推送 → 打 tag；也支持一键上架：建公开仓库 → 开 GitHub Pages → 生成手机适配的说明页 → 写入 About → 自动在主页加卡片。按 skill 自带坐标一键安装/更新，无需用户提供仓库地址或版本号。
 license: MIT
 ---
 
-> 安装根目录默认 `~/.dsh/skills`；若你的中央目录是 `<skills目录>`，设 `DSH_HOME=<skills目录的上一级>`。
+> 安装根目录就是你的中央 skills 目录：安装时写入 `~/.config/self-release/skills-root`，之后 `skill` 命令自动读取。也可用 `SKILLS_HOME=<skills目录>` 显式指定；`DSH_HOME` 仍兼容。
 
 # Skill 自更新与发布
 
@@ -60,8 +60,8 @@ python3 scripts/release.py --check
 == 自动定位结果 ==
 GitHub 仓库 : https://github.com/wpc6666/<repo>.git
 本地 skill  : <skill 目录>/<name>
-当前版本    : v1.9.2（manifest.json 单一权威来源）
-最近 tag    : v1.9.2
+当前版本    : v1.10.0（manifest.json 单一权威来源）
+最近 tag    : v1.10.0
 HEAD        : <short-hash> feat: ...
 本地状态    : main 与 origin/main 同步
 ```
@@ -233,7 +233,7 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 
 | 级别 | 前提 | agent 动作 |
 |---|---|---|
-| 1 | `~/.dsh/skills/X/.release.json` 存在 | `release.py --update X`（不用 cd） |
+| 1 | `<skills目录>/X/.release.json` 存在 | `release.py --update X`（不用 cd） |
 | 2 | 只有 `manifest.json` 的 `repository` | 同上（`_remote_coords()` 自动回退读 manifest） |
 | 3 | 什么坐标都没有 | **问用户一次**仓库地址 → `--init` 钉死 → 之后永久免问 |
 
@@ -246,7 +246,7 @@ python3 <self-release>/scripts/new_repo.py --yes        # 真执行
 每个要接入的 skill 跑一次：
 
 ```bash
-cd ~/.dsh/skills/X
+cd <skills目录>/X
 skill init https://github.com/<user>/<repo>.git --subdir "<路径>"
 ```
 

@@ -77,13 +77,13 @@ def _warn(msg):
     sys.stderr.write("警告: %s\n" % msg)
 
 
-def _run(cmd, cwd=None, quiet=True):
-    """跑命令，返回 (rc, stdout, stderr)。"""
+def _run(cmd, cwd=None, quiet=True, timeout=20):
+    """跑命令，返回 (rc, stdout, stderr)。网络命令单独放宽超时。"""
     try:
         p = subprocess.run(
             cmd, cwd=cwd or SKILL_DIR,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, timeout=20,
+            text=True, timeout=timeout,
         )
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except Exception as e:
@@ -120,7 +120,7 @@ def detect_repo():
     # ① 自身 .git/config 的 remote origin
     git_cfg = os.path.join(SKILL_DIR, ".git", "config")
     if os.path.isfile(git_cfg):
-        rc, out, _ = _run(["git", "config", "--get", "remote.origin.url"])
+        rc, out, _ = _run(["git", "config", "--get", "remote.origin.url"], cwd=SKILL_DIR)
         if rc == 0 and out:
             return out, ".git/config"
 
@@ -402,7 +402,7 @@ def write_release_cfg(repo, branch=None, subdir=None, target=None):
       2. cwd（若 cwd 有 SKILL.md / manifest.json / .release.json，且不是本脚本所在目录）
       3. SKILL_DIR（本脚本所在 skill）
 
-    这样 `cd ~/.dsh/skills/X && python3 ~/.dsh/skills/self-release/scripts/release.py --init <url>`
+    这样 `cd <skills目录>/X && python3 <skills目录>/self-release/scripts/release.py --init <url>`
     会正确写到 X，不会把 self-release 自己的坐标覆盖掉。
     """
     data = {"repo": repo}
@@ -454,9 +454,40 @@ def write_release_cfg(repo, branch=None, subdir=None, target=None):
 # ----------------------------------------------------------
 #  --install / --update：按 manifest 坐标安装或更新 skill
 # ----------------------------------------------------------
-SKILLS_ROOT = os.path.join(
-    os.environ.get("DSH_HOME", os.path.join(os.path.expanduser("~"), ".dsh")),
-    "skills")
+def _resolve_skills_root():
+    """解析中央 skills 目录。
+
+    优先级与 skill 短命令一致：
+      1. SKILLS_HOME（直接指定 skills 目录）
+      2. 安装时写下的 ~/.config/self-release/skills-root
+      3. DSH_HOME/skills（兼容旧用法）
+      4. XDG 数据目录（默认 ~/.local/share/skills）
+    """
+    env = os.environ.get("SKILLS_HOME")
+    if env:
+        return os.path.abspath(os.path.expanduser(env))
+
+    cfg_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
+        os.path.expanduser("~"), ".config")
+    cfg = os.path.join(cfg_home, "self-release", "skills-root")
+    try:
+        with io.open(cfg, encoding="utf-8") as fh:
+            root = fh.readline().strip()
+        if root:
+            return os.path.abspath(os.path.expanduser(root))
+    except OSError:
+        pass
+
+    dsh = os.environ.get("DSH_HOME")
+    if dsh:
+        return os.path.join(os.path.abspath(os.path.expanduser(dsh)), "skills")
+
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(
+        os.path.expanduser("~"), ".local", "share")
+    return os.path.join(data_home, "skills")
+
+
+SKILLS_ROOT = _resolve_skills_root()
 
 
 def _remote_coords():
@@ -494,8 +525,8 @@ def _remote_coords():
     # 兜底：复用 detect_repo 的完整五级解析（含 SKILL.md 正文链接）
     # 否则 --check 能定位、--update 却说"没有坐标"，两套逻辑不一致
     if not repo:
-        found, _src = detect_repo()
-        if found:
+        found, src = detect_repo()
+        if found and "容器仓库" not in src:
             repo = found
 
     if not skill_id:
@@ -568,6 +599,20 @@ def _write_release_json(dest, repo, branch, subdir):
     return cfgp
 
 
+def _valid_subdir(dest, subdir):
+    """校验 subdir 只能指向 dest 内部；拒绝绝对路径、.. 和 .。"""
+    if not subdir:
+        return True
+    norm = os.path.normpath(subdir)
+    if os.path.isabs(norm) or norm in (".", "..") or norm.startswith(".." + os.sep):
+        return False
+    target = os.path.abspath(os.path.join(dest, norm))
+    try:
+        return os.path.commonpath([os.path.abspath(dest), target]) == os.path.abspath(dest)
+    except ValueError:
+        return False
+
+
 def _flatten_subdir(dest, subdir):
     """把仓库里的 subdir 内容搬到 dest 根，并清掉同仓库的兄弟 skill 目录。
 
@@ -578,6 +623,9 @@ def _flatten_subdir(dest, subdir):
     安装后根目录多了 skill-b、更新后版本不生效）。
     """
     if not subdir:
+        return
+    if not _valid_subdir(dest, subdir):
+        _err("非法 subdir：%s（不能是绝对路径或包含 ..）" % subdir)
         return
     sub = os.path.join(dest, subdir)
     if os.path.isdir(sub):
@@ -708,7 +756,7 @@ def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None
         _err("目标目录已存在且非空：%s\n请先备份或指定 --target" % dest)
 
     rc, out, err = _run(["git", "clone", "--depth", "1",
-                         "--branch", branch, url, dest], cwd=parent or ".")
+                         "--branch", branch, url, dest], cwd=parent or ".", timeout=300)
     if rc != 0:
         _err("git clone 失败：%s" % (err or out))
 
@@ -719,8 +767,12 @@ def run_install(target=None, name=None, from_repo=None, branch=None, subdir=None
         if subdir:
             print("  自动探测到 skill 在子目录：%s" % subdir)
     if subdir:
+        if not _valid_subdir(dest, subdir):
+            _err("非法 subdir：%s（不能是绝对路径或包含 ..）" % subdir)
+            return 1
         if not os.path.isdir(os.path.join(dest, subdir)):
             _err("仓库里找不到子目录 %s" % subdir)
+            return 1
         _flatten_subdir(dest, subdir)
 
     cfgp = _write_release_json(dest, repo, branch, subdir)
@@ -781,9 +833,18 @@ def run_update(target=None, keep_local=None, name=None):
                 saved[_fn] = f.read()
 
     if os.path.isdir(os.path.join(dest, ".git")):
-        rc, out, err = _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=dest)
+        rc, out, err = _run(["git", "fetch", "--depth", "1", "origin", branch],
+                            cwd=dest, timeout=300)
         if rc != 0:
             _err("git fetch 失败：%s" % (err or out))
+        rc, status, _ = _run(["git", "status", "--porcelain"], cwd=dest)
+        dirty = [line for line in status.splitlines()
+                 if line.strip() and ".release.json" not in line]
+        if dirty and os.environ.get("RELEASE_FORCE") != "1":
+            _err("本地有未提交改动，git reset --hard 会覆盖它们：\n  "
+                 + "\n  ".join(dirty[:10])
+                 + "\n先提交/备份，或设 RELEASE_FORCE=1 强制更新")
+            return 1
         rc, out, err = _run(["git", "reset", "--hard", "origin/" + branch], cwd=dest)
         if rc != 0:
             _err("git reset 失败：%s" % (err or out))
@@ -817,7 +878,15 @@ def run_update(target=None, keep_local=None, name=None):
             if subdir:
                 print("  自动探测到 skill 在子目录：%s" % subdir)
         if subdir:
+            if not _valid_subdir(srcroot, subdir):
+                _err("非法 subdir：%s（不能是绝对路径或包含 ..）" % subdir)
+                shutil.rmtree(tmpd, ignore_errors=True)
+                return 1
             srcroot = os.path.join(srcroot, subdir)
+            if not os.path.isdir(srcroot):
+                _err("压缩包里找不到子目录 %s" % subdir)
+                shutil.rmtree(tmpd, ignore_errors=True)
+                return 1
         for name in os.listdir(srcroot):
             s = os.path.join(srcroot, name)
             d = os.path.join(dest, name)

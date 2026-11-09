@@ -10,9 +10,10 @@
 curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
 ```
 
-默认安装到 `~/.dsh/skills/self-release/`，可用 `DSH_HOME` 修改根目录；
-本机中央目录是 `<skills目录>` 时，用 `DSH_HOME=<skills目录的上一级>` 让安装落到同一处。
-安装是幂等的：已安装时转为更新流程。
+默认安装到中央 skills 目录；安装器会把实际路径写入
+`~/.config/self-release/skills-root`，之后 `skill` 命令与 `release.py` 自动读取。
+也可用 `SKILLS_HOME=<skills目录>` 显式指定（`DSH_HOME` 仍兼容）。
+安装是幂等的：已安装时转为更新流程，并刷新 `skill` 短命令。
 
 ## 日常命令
 

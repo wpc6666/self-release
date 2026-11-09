@@ -9,7 +9,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/wpc6666/self-release/main/install.sh | bash
 #
 # 装完后，任何带 .release.json 的 skill 都可以一句话更新：
-#   cd ~/.dsh/skills/X && python3 scripts/release.py --update
+#   cd <skills目录>/X && python3 scripts/release.py --update
 # ============================================================
 set -euo pipefail
 
@@ -17,9 +17,24 @@ readonly REPO="wpc6666/self-release"
 readonly BRANCH="${SELF_RELEASE_BRANCH:-main}"
 readonly SKILL_NAME="self-release"
 
-# 目标目录：优先 DSH_HOME，其次 ~/.dsh
-DSH_HOME="${DSH_HOME:-${HOME}/.dsh}"
-SKILLS_DIR="${DSH_HOME}/skills"
+# 目标目录优先级：
+#   1. SKILLS_HOME —— 直接指向中央 skills 目录
+#   2. DSH_HOME/skills —— 兼容旧用法
+#   3. 上次安装记下的根目录 ~/.config/self-release/skills-root
+#   4. XDG 数据目录（默认 ~/.local/share/skills）
+# 安装时会记住实际路径，后续 skill / release.py 不再依赖环境变量。
+CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/self-release"
+CONFIG_FILE="${CONFIG_DIR}/skills-root"
+if [[ -n "${SKILLS_HOME:-}" ]]; then
+  SKILLS_DIR="${SKILLS_HOME}"
+elif [[ -n "${DSH_HOME:-}" ]]; then
+  SKILLS_DIR="${DSH_HOME}/skills"
+elif [[ -r "${CONFIG_FILE}" ]]; then
+  IFS= read -r SKILLS_DIR < "${CONFIG_FILE}" || SKILLS_DIR=""
+  [[ -n "${SKILLS_DIR}" ]] || SKILLS_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/skills"
+else
+  SKILLS_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/skills"
+fi
 DEST="${SKILLS_DIR}/${SKILL_NAME}"
 
 # 颜色（非终端时自动关闭）
@@ -32,6 +47,27 @@ ok()   { printf '%s✅ %s%s\n' "$C_OK"   "$*" "$C_RST"; }
 warn() { printf '%s⚠️  %s%s\n' "$C_WARN" "$*" "$C_RST"; }
 err()  { printf '%s❌ %s%s\n' "$C_ERR"  "$*" "$C_RST" >&2; }
 die()  { err "$*"; exit 1; }
+
+# 记住本次安装根目录：之后 skill 命令与 release.py 都读这里，
+# 不再依赖用户每次手动设置 DSH_HOME。
+remember_root() {
+  mkdir -p "${CONFIG_DIR}"
+  printf '%s\n' "${SKILLS_DIR}" > "${CONFIG_FILE}"
+}
+
+# 安装/刷新 skill 短命令。更新流程也会走到这里，避免旧版命令继续指向旧目录。
+install_cli() {
+  local src="${DEST}/skill"
+  local bin="${HOME}/.local/bin/skill"
+  [[ -f "${src}" ]] || return 0
+  mkdir -p "$(dirname "${bin}")"
+  if [[ -f "${bin}" ]] && ! cmp -s "${src}" "${bin}"; then
+    cp "${bin}" "${bin}.bak.$(date '+%Y%m%d_%H%M%S')"
+  fi
+  cp "${src}" "${bin}"
+  chmod +x "${bin}"
+  ok "已安装 skill 命令：${bin}"
+}
 
 echo "════════════════════════════════════════════════════"
 echo "  self-release 安装器"
@@ -51,12 +87,14 @@ ok "git / python3 ${PY_VER} 就绪"
 if [[ -f "${DEST}/scripts/release.py" ]]; then
   warn "检测到已安装：${DEST}"
   echo "  转为更新流程…"
+  remember_root
   cd "${DEST}"
   if [[ -f .release.json ]] || [[ -f manifest.json ]]; then
     python3 scripts/release.py --update || die "更新失败"
   else
     die "目录存在但缺配置，请先手动删除：${DEST}"
   fi
+  install_cli
   echo
   ok "已更新到最新版"
   echo
@@ -98,7 +136,7 @@ fi
 if [[ "${DOWNLOADED}" -eq 1 ]]; then
   mkdir -p "${TMPD}/x"
   tar xzf "${TGZ}" -C "${TMPD}/x" || die "解压失败"
-  SRCROOT=$(find "${TMPD}/x" -mindepth 1 -maxdepth 1 -type d | head -1)
+  SRCROOT=$(find "${TMPD}/x" -mindepth 1 -maxdepth 1 -type d -print -quit)
   [[ -n "${SRCROOT}" ]] || die "压缩包结构异常"
   mkdir -p "${DEST}"
   # 复制全部文件（含隐藏文件），排除 .git
@@ -124,25 +162,21 @@ cat > "${DEST}/.release.json" <<EOF
 EOF
 ok "已写入 .release.json（以后更新不需要原始链接）"
 
-# ---------- 安装 skill 短命令 ----------
+# ---------- 记住根目录 + 安装 skill 短命令 ----------
 # 这是「只说一句话」的关键：用户敲 skill update X，而不是一长串 python3 路径
-LOCAL_BIN="${HOME}/.local/bin"
-mkdir -p "${LOCAL_BIN}"
-if [[ -f "${DEST}/skill" ]]; then
-  cp "${DEST}/skill" "${LOCAL_BIN}/skill"
-  chmod +x "${LOCAL_BIN}/skill"
-  ok "已安装 skill 命令：${LOCAL_BIN}/skill"
-  case ":${PATH}:" in
-    *":${LOCAL_BIN}:"*) ;;
-    *)
-      warn "${LOCAL_BIN} 不在 PATH 里，把下面这行加到 ~/.zshrc："
-      echo "    export PATH=\"\${HOME}/.local/bin:\${PATH}\""
-      ;;
-  esac
-else
+remember_root
+install_cli
+if [[ ! -f "${DEST}/skill" ]]; then
   warn "仓库里没有 skill 命令（旧版本），跳过；可用长命令："
   echo "    python3 ${DEST}/scripts/release.py --list"
 fi
+case ":${PATH}:" in
+  *":${HOME}/.local/bin:"*) ;;
+  *)
+    warn "${HOME}/.local/bin 不在 PATH 里，把下面这行加到 ~/.zshrc："
+    echo "    export PATH=\"\${HOME}/.local/bin:\${PATH}\""
+    ;;
+esac
 
 # ---------- 自检 ----------
 echo
